@@ -37,6 +37,7 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
   let chosenTag: Tag | null = null;
   let chosenWhy: string | null = null;
   let count = 0;
+  let shutterMs = 0; // 셔터→동결 표시까지의 앱 지연
   const captureSw = new Stopwatch();
 
   const hudChip = (label: string, ms: number, budget?: number) => {
@@ -64,6 +65,7 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
   shutter.onclick = async () => {
     if (phase !== "live") return;
     captureSw.reset();
+    const shutterSw = new Stopwatch();
     try {
       frame = await grabFrame(video);
     } catch {
@@ -75,9 +77,11 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
     canvas.height = video.videoHeight;
     canvas.getContext("2d")?.drawImage(video, 0, 0);
     canvas.toBlob((b) => {
-      if (!b) return;
-      freezeUrl = URL.createObjectURL(b);
-      freeze.src = freezeUrl;
+      if (b) {
+        freezeUrl = URL.createObjectURL(b);
+        freeze.src = freezeUrl;
+      }
+      shutterMs = shutterSw.stop(); // 동결 표시까지의 앱 지연
     }, "image/jpeg", 0.6);
 
     cam.classList.add("is-frozen");
@@ -132,6 +136,7 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
   // --- 저장: 사용자 체감 완료 시점에 캡처 ms 측정 ---
   saveBtn.onclick = async () => {
     if (!chosenTag) return;
+    const saveSw = new Stopwatch(); // 저장 탭 → 커밋·카메라 복귀까지 앱 지연
     const freeVal = free.style.display === "block" ? free.value.trim() : "";
     const why = freeVal || chosenWhy || null;
 
@@ -150,13 +155,17 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
 
     // 메타 우선 저장 → 즉시 복귀(카메라 막지 않음). 압축은 백그라운드.
     await addCapture(rec);
-    const captureMs = captureSw.stop();
+    const captureMs = captureSw.stop(); // 셔터→저장 총합(사람 포함)
     count += 1;
     cntEl.textContent = `📍 ${count}`;
 
     closeSheet();
     showDone();
     resetToLive();
+
+    // 앱이 끼어든 시간 = 셔터 동결 + 저장 커밋·복귀. 사람 판단 시간은 별도.
+    const appMs = shutterMs + saveSw.stop();
+    const humanMs = Math.max(0, captureMs - appMs);
 
     // 배경 압축(ADR-003) → 이미지 채워 갱신
     let compressMs = 0;
@@ -179,17 +188,23 @@ export function mountCapture(root: HTMLElement, session: Session, bookTitle: str
       frame = null;
     }
 
-    record({ captureMs, compressMs, sizeKB });
-    renderHud(captureMs, compressMs, sizeKB);
+    record({ captureMs, appMs, humanMs, compressMs, sizeKB });
+    renderHud({ appMs, humanMs, compressMs, sizeKB });
   };
 
-  function renderHud(captureMs: number, compressMs: number, sizeKB: number) {
+  function renderHud(m: {
+    appMs: number;
+    humanMs: number;
+    compressMs: number;
+    sizeKB: number;
+  }) {
     const warmup = hud.querySelector(".hud__chip")?.outerHTML ?? "";
     hud.innerHTML =
       warmup +
-      hudChip("capture", captureMs, BUDGET.captureMs) +
-      hudChip("compress", compressMs) +
-      (sizeKB ? sizeChip(sizeKB) : "");
+      hudChip("app", m.appMs, BUDGET.appMs) +
+      `<span class="hud__chip">사람 ${Math.round(m.humanMs)}ms</span>` +
+      hudChip("compress", m.compressMs) +
+      (m.sizeKB ? sizeChip(m.sizeKB) : "");
   }
 
   function showDone() {
