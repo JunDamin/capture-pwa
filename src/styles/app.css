@@ -1,0 +1,326 @@
+/* Capture 화면 — docs/design-language.md / mockup.html 기준 */
+
+#app {
+  position: relative;
+  overflow: hidden;
+}
+
+/* ---- 카메라 (유일한 다크 풀블리드) ---- */
+.cam {
+  position: absolute;
+  inset: 0;
+  background: var(--view);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+.cam__video,
+.cam__freeze {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+.cam__freeze {
+  z-index: 1;
+  display: none;
+}
+.cam.is-frozen .cam__freeze {
+  display: block;
+}
+.cam__scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.5) 0%,
+    rgba(0, 0, 0, 0) 22%,
+    rgba(0, 0, 0, 0) 58%,
+    rgba(0, 0, 0, 0.7) 100%
+  );
+}
+
+/* ---- 상단 맥락 pill ---- */
+.pill {
+  position: relative;
+  z-index: 3;
+  margin: calc(var(--safe-top) + 10px) 16px 0;
+  padding: 11px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  border-radius: 16px;
+}
+.pill .sep {
+  color: rgba(255, 255, 255, 0.4);
+}
+.pill .cnt {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: rgba(255, 255, 255, 0.15);
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+
+/* ---- 하단 조작부 ---- */
+.bottom {
+  position: relative;
+  z-index: 3;
+  margin-top: auto;
+  padding: 0 16px calc(var(--safe-bottom) + 26px);
+}
+.hint {
+  text-align: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 14px;
+  min-height: 18px;
+}
+.tagrow {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+.tag {
+  flex: 1;
+  aspect-ratio: 1;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  transition: transform 0.18s var(--spring), background 0.15s ease;
+}
+.tag:active {
+  transform: scale(0.94);
+}
+.tag.is-sel {
+  background: #fff;
+  transform: translateY(-6px) scale(1.06);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.45);
+}
+.cam:not(.is-frozen) .tagrow {
+  opacity: 0.4;
+  pointer-events: none;
+}
+
+.shutter-wrap {
+  display: flex;
+  justify-content: center;
+}
+.shutter {
+  width: 74px;
+  height: 74px;
+  border-radius: 50%;
+  background: #fff;
+  border: 5px solid rgba(255, 255, 255, 0.35);
+  background-clip: padding-box;
+  transition: transform 0.12s ease;
+}
+.shutter:active {
+  transform: scale(0.9);
+}
+.cam.is-frozen .shutter-wrap {
+  display: none;
+}
+
+/* ---- Why 바텀시트 ---- */
+.sheet-scrim {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  background: rgba(0, 0, 0, 0.35);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.sheet-scrim.is-open {
+  opacity: 1;
+  pointer-events: auto;
+}
+.sheet {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 5;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 24px 24px 0 0;
+  padding: 10px 22px calc(var(--safe-bottom) + 22px);
+  transform: translateY(100%);
+  transition: transform 0.32s var(--spring);
+}
+.sheet.is-open {
+  transform: translateY(0);
+}
+.grab {
+  width: 38px;
+  height: 5px;
+  border-radius: 3px;
+  background: #e5e8eb;
+  margin: 0 auto 18px;
+}
+.sheet__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: #fff6e6;
+  color: #c77f00;
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 18px;
+}
+.sheet h2 {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 4px;
+}
+.sheet__cap {
+  font-size: 14px;
+  color: var(--sub);
+  font-weight: 500;
+  margin-bottom: 20px;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+  margin-bottom: 14px;
+}
+.chip {
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 11px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  transition: transform 0.15s var(--spring);
+}
+.chip:active {
+  transform: scale(0.95);
+}
+.chip.is-sel {
+  background: #e7f0fe;
+  color: var(--primary);
+}
+.chip.chip--write {
+  color: var(--sub);
+}
+.sheet__free {
+  width: 100%;
+  border: none;
+  background: var(--surface);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-family: inherit;
+  margin-bottom: 14px;
+  resize: none;
+}
+.btn-primary {
+  width: 100%;
+  height: 56px;
+  border-radius: var(--r-btn);
+  background: var(--primary);
+  color: #fff;
+  font-size: 17px;
+  font-weight: 700;
+  box-shadow: 0 8px 20px rgba(49, 130, 246, 0.3);
+  transition: transform 0.1s ease, background 0.1s ease;
+}
+.btn-primary:active {
+  transform: scale(0.98);
+  background: var(--primary-press);
+}
+
+/* ---- 저장 완료 토스트 (시그니처: 저장의 쾌감) ---- */
+.done {
+  position: absolute;
+  inset: 0;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  opacity: 0;
+}
+.done.is-show {
+  animation: donepop 0.7s var(--spring);
+}
+.done__badge {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44px;
+  box-shadow: 0 12px 36px rgba(49, 130, 246, 0.5);
+}
+@keyframes donepop {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  30% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.1);
+  }
+}
+
+/* ---- 예산 HUD (개발용 계측 노출 — PRD §16) ---- */
+.hud {
+  position: absolute;
+  z-index: 7;
+  top: calc(var(--safe-top) + 64px);
+  left: 16px;
+  right: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+}
+.hud__chip {
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  padding: 5px 9px;
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+}
+.hud__chip.ok {
+  background: rgba(33, 160, 90, 0.85);
+}
+.hud__chip.over {
+  background: rgba(232, 77, 77, 0.9);
+}

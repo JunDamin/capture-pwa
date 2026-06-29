@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capture · Mockup</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+<style>
+  :root{
+    --ink:#191F28; --sub:#8B95A1; --surface:#F2F4F6;
+    --bg:#FFFFFF; --bg2:#F9FAFB; --primary:#3182F6; --view:#17171C;
+    --r-card:16px; --r-btn:14px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  body{
+    font-family:'Pretendard',-apple-system,BlinkMacSystemFont,system-ui,sans-serif;
+    background:#E8EBED; color:var(--ink);
+    display:flex; gap:32px; flex-wrap:wrap; justify-content:center;
+    padding:40px 20px; min-height:100vh;
+    font-feature-settings:"tnum";
+  }
+  .label{position:absolute; top:-26px; left:4px; font-size:13px; font-weight:600; color:#6b7684;}
+  .phone{
+    position:relative; width:340px; height:720px; background:var(--bg);
+    border-radius:44px; overflow:hidden; box-shadow:0 24px 60px rgba(0,0,0,.18);
+    border:8px solid #0d0d12;
+  }
+  .screen{height:100%; display:flex; flex-direction:column; position:relative;}
+  .statusbar{height:44px; display:flex; align-items:center; justify-content:center;
+    font-size:14px; font-weight:700; color:var(--ink); flex-shrink:0;}
+  .statusbar.dark{color:#fff;}
+
+  /* ---------- HOME ---------- */
+  .home{padding:8px 22px 22px; overflow-y:auto;}
+  .home h1{font-size:15px; font-weight:600; color:var(--sub); margin:14px 0 16px;}
+  .bookcard{
+    background:var(--surface); border-radius:20px; padding:22px; margin-bottom:24px;
+  }
+  .bookcard .row{display:flex; gap:16px; align-items:center;}
+  .cover{width:64px; height:88px; border-radius:10px; flex-shrink:0;
+    background:linear-gradient(150deg,#3182F6,#1b5fd0); box-shadow:0 6px 16px rgba(49,130,246,.35);
+    display:flex; align-items:flex-end; padding:8px; color:#fff; font-size:11px; font-weight:700; line-height:1.3;}
+  .booktitle{font-size:22px; font-weight:800; letter-spacing:-.02em;}
+  .bookmeta{font-size:14px; color:var(--sub); margin-top:4px; font-weight:500;}
+  .sessionchip{display:inline-flex; align-items:center; gap:6px; margin-top:14px;
+    background:#fff; border-radius:999px; padding:7px 13px; font-size:13px; font-weight:700;}
+  .dot{width:7px;height:7px;border-radius:50%;background:var(--primary);}
+  .cta{
+    background:var(--primary); color:#fff; border:none; width:100%; height:56px;
+    border-radius:var(--r-btn); font-size:17px; font-weight:700; font-family:inherit;
+    display:flex; align-items:center; justify-content:center; gap:8px; cursor:pointer;
+    box-shadow:0 8px 20px rgba(49,130,246,.3); margin-bottom:28px;
+  }
+  .sectit{font-size:15px; font-weight:700; color:var(--ink); margin-bottom:12px;}
+  .recent{display:flex; flex-direction:column; gap:2px;}
+  .recent .item{display:flex; align-items:center; gap:14px; padding:13px 4px;}
+  .mini{width:38px;height:50px;border-radius:7px;flex-shrink:0;}
+  .m1{background:linear-gradient(150deg,#3182F6,#1b5fd0);}
+  .m2{background:linear-gradient(150deg,#7C5CFC,#5538d6);}
+  .m3{background:linear-gradient(150deg,#2AC1BC,#159d98);}
+  .recent .t{font-size:16px;font-weight:700;}
+  .recent .s{font-size:13px;color:var(--sub);font-weight:500;margin-top:2px;}
+  .recent .when{margin-left:auto;font-size:13px;color:var(--sub);font-weight:600;}
+
+  /* ---------- CAPTURE (camera) ---------- */
+  .cam{background:var(--view); color:#fff;}
+  .cam .screen{justify-content:space-between;}
+  .pill{margin:6px 16px 0; background:rgba(255,255,255,.12); backdrop-filter:blur(8px);
+    border-radius:16px; padding:11px 16px; display:flex; align-items:center; gap:10px;
+    font-size:13px; font-weight:600;}
+  .pill .sep{color:rgba(255,255,255,.4);}
+  .pill .cnt{margin-left:auto; display:inline-flex; align-items:center; gap:5px;
+    background:rgba(255,255,255,.15); padding:4px 10px; border-radius:999px; font-weight:700;}
+  .viewfinder{position:absolute; inset:0; z-index:-1;
+    background:
+      linear-gradient(180deg,rgba(0,0,0,.45),rgba(0,0,0,0) 22%,rgba(0,0,0,0) 60%,rgba(0,0,0,.65)),
+      repeating-linear-gradient(0deg,#23232b 0 2px,#1c1c22 2px 26px),
+      #1e1e25;
+  }
+  .pagehint{position:absolute; top:46%; left:50%; transform:translate(-50%,-50%);
+    color:rgba(255,255,255,.32); font-size:13px; font-weight:600; text-align:center; line-height:1.6;}
+  .bottom{padding:0 16px 26px;}
+  .tagrow{display:flex; justify-content:space-between; gap:8px; margin-bottom:22px;}
+  .tag{flex:1; aspect-ratio:1; background:rgba(255,255,255,.1); border-radius:16px;
+    display:flex; align-items:center; justify-content:center; font-size:24px;
+    transition:transform .18s cubic-bezier(.34,1.56,.64,1);}
+  .tag.sel{background:#fff; transform:translateY(-6px) scale(1.06); box-shadow:0 10px 24px rgba(0,0,0,.4);}
+  .shutter-wrap{display:flex; justify-content:center;}
+  .shutter{width:74px;height:74px;border-radius:50%;background:#fff; border:5px solid rgba(255,255,255,.35);
+    background-clip:padding-box; cursor:pointer;}
+
+  /* ---------- WHY sheet ---------- */
+  .scrim{position:absolute; inset:0; background:rgba(0,0,0,.35);}
+  .thumb{position:absolute; inset:0; background:
+      repeating-linear-gradient(0deg,#23232b 0 2px,#1c1c22 2px 26px),#1e1e25;}
+  .sheet{position:absolute; left:0; right:0; bottom:0; background:#fff;
+    border-radius:24px 24px 0 0; padding:10px 22px 26px;}
+  .grab{width:38px;height:5px;border-radius:3px;background:#E5E8EB;margin:0 auto 18px;}
+  .sheet h2{font-size:22px;font-weight:800;letter-spacing:-.02em;margin-bottom:4px;}
+  .sheet .cap{font-size:14px;color:var(--sub);font-weight:500;margin-bottom:20px;}
+  .chips{display:flex;flex-wrap:wrap;gap:9px;margin-bottom:14px;}
+  .chip{background:var(--surface);border-radius:999px;padding:11px 16px;font-size:15px;font-weight:600;}
+  .chip.sel{background:#E7F0FE;color:var(--primary);}
+  .chip.write{color:var(--sub);}
+  .selectedtag{display:inline-flex;align-items:center;gap:7px;background:#FFF6E6;color:#C77F00;
+    border-radius:999px;padding:7px 13px;font-size:13px;font-weight:700;margin-bottom:18px;}
+  .save{background:var(--primary);color:#fff;border:none;width:100%;height:56px;border-radius:var(--r-btn);
+    font-size:17px;font-weight:700;font-family:inherit;box-shadow:0 8px 20px rgba(49,130,246,.3);cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- HOME -->
+<div class="phone"><span class="label">Home</span>
+  <div class="screen">
+    <div class="statusbar">9:41</div>
+    <div class="home">
+      <h1>지금 읽는 책</h1>
+      <div class="bookcard">
+        <div class="row">
+          <div class="cover">원자<br>습관</div>
+          <div>
+            <div class="booktitle">원자 습관</div>
+            <div class="bookmeta">제임스 클리어</div>
+            <div class="sessionchip"><span class="dot"></span>현재 세션 · 17 Captures</div>
+          </div>
+        </div>
+      </div>
+      <button class="cta">▶ 독서 시작</button>
+      <div class="sectit">최근 세션</div>
+      <div class="recent">
+        <div class="item"><div class="mini m1"></div><div><div class="t">원자 습관</div><div class="s">17 captures · 지방교육</div></div><div class="when">오늘</div></div>
+        <div class="item"><div class="mini m2"></div><div><div class="t">몰입</div><div class="s">9 captures</div></div><div class="when">어제</div></div>
+        <div class="item"><div class="mini m3"></div><div><div class="t">클린 코드</div><div class="s">23 captures</div></div><div class="when">3일 전</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CAPTURE -->
+<div class="phone cam"><span class="label">Capture · 카메라</span>
+  <div class="screen">
+    <div class="viewfinder"></div>
+    <div class="pagehint">책 페이지를<br>화면에 담으세요</div>
+    <div class="statusbar dark">9:41</div>
+    <div class="pill">
+      📚 원자 습관 <span class="sep">·</span> 🎯 지방교육
+      <span class="cnt">📍 17</span>
+    </div>
+    <div class="bottom">
+      <div class="tagrow">
+        <div class="tag">💡</div>
+        <div class="tag sel">⭐</div>
+        <div class="tag">🔗</div>
+        <div class="tag">❓</div>
+        <div class="tag">🌱</div>
+      </div>
+      <div class="shutter-wrap"><div class="shutter"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- WHY SHEET -->
+<div class="phone"><span class="label">"왜 저장했나요?" 시트</span>
+  <div class="screen">
+    <div class="thumb"></div>
+    <div class="statusbar dark">9:41</div>
+    <div class="scrim"></div>
+    <div class="sheet">
+      <div class="grab"></div>
+      <div class="selectedtag">⭐ 중요하다</div>
+      <h2>왜 저장했나요?</h2>
+      <div class="cap">한 번만 탭하면 끝 — 건너뛰어도 돼요.</div>
+      <div class="chips">
+        <span class="chip sel">프로젝트에 써먹기</span>
+        <span class="chip">다시 읽고 싶음</span>
+        <span class="chip">반대되는 생각</span>
+        <span class="chip">글감</span>
+        <span class="chip write">직접 입력…</span>
+      </div>
+      <button class="save">저장</button>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

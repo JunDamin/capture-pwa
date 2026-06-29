@@ -1,0 +1,8 @@
+node_modules
+dist
+*.local
+.DS_Store
+
+# 설치된 외부 스킬 툴링 (앱 코드 아님)
+.agents/
+.claude/
