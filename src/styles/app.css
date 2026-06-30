@@ -713,6 +713,21 @@
   padding: 9px 14px;
   border-radius: 999px;
 }
+.toBookExport { margin-top: 8px; }
+.danger-link {
+  display: block;
+  width: 100%;
+  margin: 24px auto 8px;
+  padding: 12px;
+  min-height: 48px;
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 14px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
 .srow {
   display: flex;
   justify-content: space-between;
