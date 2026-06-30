@@ -2,6 +2,7 @@
 import type { Nav, Scope } from "../app.ts";
 import { getCapture, updateCapture } from "../db/db.ts";
 import { TAGS, WHY_CHIPS, isValidCapture, type Capture, type Tag } from "../db/types.ts";
+import { openImageViewer } from "../lib/viewer.ts";
 
 export function mountDetail(
   root: HTMLElement,
@@ -80,6 +81,25 @@ export function mountDetail(
       const u = URL.createObjectURL(cap.image);
       urls.push(u);
       (root.querySelector(".detail__photo") as HTMLElement).style.backgroundImage = `url(${u})`;
+    }
+
+    const photoEl = root.querySelector(".detail__photo") as HTMLElement;
+    if (cap.image) {
+      photoEl.onclick = () => {
+        if (!cap.image) return;
+        openImageViewer(cap.image, {
+          onCrop: async (blob, w, h) => {
+            cap.image = blob;
+            cap.imageW = w;
+            cap.imageH = h;
+            await updateCapture({ ...cap, image: blob, imageW: w, imageH: h, updatedAt: Date.now() });
+            // 상세 썸네일 갱신
+            const u = URL.createObjectURL(blob);
+            urls.push(u);
+            photoEl.style.backgroundImage = `url(${u})`;
+          },
+        });
+      };
     }
 
     (root.querySelector(".back") as HTMLElement).onclick = back;
