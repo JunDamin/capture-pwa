@@ -1,11 +1,11 @@
 /**
  * 이미지 리사이즈 + 압축 — ADR-003.
- * 긴 변 ~1600px, JPEG ~0.7 → 목표 200–500KB. 원본 미보관.
+ * 긴 변 ~3200px, JPEG ~0.8 → 책 글씨 가독 우선(확대/크롭 대비). 원본 미보관.
  * 저장 직후 백그라운드에서 호출하여 카메라 복귀를 막지 않는다.
  */
 
-export const IMAGE_MAX_EDGE = 1600;
-export const IMAGE_QUALITY = 0.7;
+export const IMAGE_MAX_EDGE = 3200;
+export const IMAGE_QUALITY = 0.8;
 
 type Source = ImageBitmap | HTMLVideoElement | HTMLCanvasElement;
 
