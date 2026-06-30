@@ -109,6 +109,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   font-size: 24px;
   transition: transform 0.18s var(--spring), background 0.15s ease;
@@ -130,6 +131,10 @@
 .cam:not(.is-frozen) .photo-ctrl .tagrow {
   opacity: 0.4;
   pointer-events: none;
+}
+/* 사진 모드: 선택된 태그 라벨이 흰 배경에서 보이도록 */
+.photo-ctrl .tag.is-sel .tag__l {
+  color: var(--ink);
 }
 
 .shutter-wrap {
@@ -381,8 +386,8 @@
   margin: 0 -4px 14px;
 }
 .iconbtn {
-  width: 36px;
-  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 10px;
   font-size: 26px;
   line-height: 1;
@@ -749,9 +754,14 @@
 }
 .capdel {
   font-size: 16px;
-  padding: 8px;
+  padding: 0;
+  min-width: 44px;
+  min-height: 44px;
   opacity: 0.55;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .capdel:active {
   opacity: 1;
@@ -783,16 +793,13 @@
   line-height: 1.6;
   margin-top: 14px;
 }
-.export .share {
-  margin-bottom: 10px;
-}
 .exp__alt {
   display: flex;
   gap: 10px;
   margin-bottom: 18px;
 }
 .promptview {
-  font-family: ui-monospace, SFMono-Regular, Menlo, "Pretendard", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   line-height: 1.55;
   color: #3a4350;
@@ -824,8 +831,8 @@
   color: #fff;
   font-size: 24px;
   line-height: 1;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   margin: -4px 2px -4px -4px;
   display: flex;
   align-items: center;
