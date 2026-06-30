@@ -107,21 +107,22 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
     capEl = null;
     mode = ""; pid = -1; saveCropRect(rect);
   }
+  function onResize() {
+    vw = camEl.clientWidth; vh = camEl.clientHeight;
+    render();
+  }
   overlay.addEventListener("pointerdown", onDown);
   overlay.addEventListener("pointermove", onMove);
   overlay.addEventListener("pointerup", onUp);
   overlay.addEventListener("pointercancel", onUp);
-  window.addEventListener("resize", () => {
-    vw = camEl.clientWidth; vh = camEl.clientHeight;
-    render();
-  });
+  window.addEventListener("resize", onResize);
   vw = camEl.clientWidth; vh = camEl.clientHeight;
   render();
 
   return {
     getRect: () => rect,
     destroy: () => {
-      window.removeEventListener("resize", render);
+      window.removeEventListener("resize", onResize);
       overlay.remove();
     },
   };
