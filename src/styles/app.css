@@ -109,6 +109,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 2px;
   font-size: 24px;
   transition: transform 0.18s var(--spring), background 0.15s ease;
@@ -130,6 +131,10 @@
 .cam:not(.is-frozen) .photo-ctrl .tagrow {
   opacity: 0.4;
   pointer-events: none;
+}
+/* 사진 모드: 선택된 태그 라벨이 흰 배경에서 보이도록 */
+.photo-ctrl .tag.is-sel .tag__l {
+  color: var(--ink);
 }
 
 .shutter-wrap {
@@ -381,8 +386,8 @@
   margin: 0 -4px 14px;
 }
 .iconbtn {
-  width: 36px;
-  height: 36px;
+  min-width: 44px;
+  min-height: 44px;
   border-radius: 10px;
   font-size: 26px;
   line-height: 1;
@@ -749,9 +754,14 @@
 }
 .capdel {
   font-size: 16px;
-  padding: 8px;
+  padding: 0;
+  min-width: 44px;
+  min-height: 44px;
   opacity: 0.55;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 .capdel:active {
   opacity: 1;
@@ -783,16 +793,13 @@
   line-height: 1.6;
   margin-top: 14px;
 }
-.export .share {
-  margin-bottom: 10px;
-}
 .exp__alt {
   display: flex;
   gap: 10px;
   margin-bottom: 18px;
 }
 .promptview {
-  font-family: ui-monospace, SFMono-Regular, Menlo, "Pretendard", monospace;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 11px;
   line-height: 1.55;
   color: #3a4350;
@@ -824,8 +831,8 @@
   color: #fff;
   font-size: 24px;
   line-height: 1;
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   margin: -4px 2px -4px -4px;
   display: flex;
   align-items: center;
@@ -1013,7 +1020,7 @@
   background: rgba(0, 0, 0, 0.5);
   color: #fff;
   font-size: 20px;
-  z-index: 1001;
+  z-index: 1003; /* above cropbox handles (1002) */
 }
 .viewer__crop {
   position: fixed;
@@ -1022,8 +1029,88 @@
   bottom: calc(16px + var(--safe-bottom));
   width: min(100% - 40px, 480px);
   min-height: 48px;
-  z-index: 1001;
+  z-index: 1003; /* above cropbox handles (1002) */
 }
+
+/* ---- 조절형 크롭 박스 ---- */
+.viewer__cropbox {
+  position: absolute;
+  z-index: 1002;
+  pointer-events: none; /* 박스 테두리 자체는 이벤트 투과; 핸들만 수신 */
+  box-sizing: border-box;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+}
+
+/* 핸들: 44×44 터치 hit-area, 박스 모서리·변 중앙에 위치 */
+.viewer__handle {
+  position: absolute;
+  width: 44px;
+  height: 44px;
+  pointer-events: auto;
+  touch-action: none;
+}
+
+/* 핸들 시각 마커(::after 가상요소) */
+.viewer__handle::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: #fff;
+  border-radius: 2px;
+  box-shadow: 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+/* 모서리: 정사각형 14×14 */
+.viewer__handle[data-h="nw"]::after,
+.viewer__handle[data-h="ne"]::after,
+.viewer__handle[data-h="sw"]::after,
+.viewer__handle[data-h="se"]::after {
+  width: 14px;
+  height: 14px;
+}
+
+/* 상·하 변 핸들: 가로 바 */
+.viewer__handle[data-h="n"]::after,
+.viewer__handle[data-h="s"]::after {
+  width: 24px;
+  height: 4px;
+}
+
+/* 좌·우 변 핸들: 세로 바 */
+.viewer__handle[data-h="w"]::after,
+.viewer__handle[data-h="e"]::after {
+  width: 4px;
+  height: 24px;
+}
+
+/* 핸들 위치: hit-area 중심이 박스 꼭짓점/변 중앙에 오도록 (-22px = 44px/2) */
+.viewer__handle[data-h="nw"] { top: -22px; left: -22px; }
+.viewer__handle[data-h="n"]  { top: -22px; left: calc(50% - 22px); }
+.viewer__handle[data-h="ne"] { top: -22px; right: -22px; }
+.viewer__handle[data-h="w"]  { top: calc(50% - 22px); left: -22px; }
+.viewer__handle[data-h="e"]  { top: calc(50% - 22px); right: -22px; }
+.viewer__handle[data-h="sw"] { bottom: -22px; left: -22px; }
+.viewer__handle[data-h="s"]  { bottom: -22px; left: calc(50% - 22px); }
+.viewer__handle[data-h="se"] { bottom: -22px; right: -22px; }
+
+/* 마스크: 크롭 박스 바깥 반투명 오버레이 */
+.viewer__mask {
+  position: absolute;
+  z-index: 1001;
+  background: rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+
+/* top/bottom 마스크: 전체 너비 */
+.viewer__mask--top,
+.viewer__mask--bottom {
+  left: 0;
+  right: 0;
+}
+
+/* left/right 마스크: 높이·위치는 renderBox()에서 동적 설정 */
 
 /* ============================================================
    모드 토글 — 캡처 pill + Books renderProject (ADR-013)

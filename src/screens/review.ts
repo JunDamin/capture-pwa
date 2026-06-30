@@ -38,6 +38,9 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   })();
 
   function render(caps: Capture[]) {
+    // revoke previous batch before re-creating to prevent objectURL accumulation
+    urls.forEach((u) => URL.revokeObjectURL(u));
+    urls.length = 0;
     const scopeLabel = scope === "session" ? "이번 세션" : "이 책 전체";
 
     const tagRows = TAGS.map((t) => {
@@ -98,7 +101,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         if (next === null) return;
         const project = next.trim() || undefined;
         session = { ...session!, project };
-        putSession(session).then(() => render(caps));
+        putSession(session).then(() => render(caps)).catch((e) => console.error("putSession failed", e));
       };
     }
 
@@ -138,7 +141,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   }
 
   function emptyState() {
-    return `<div class="hint-empty">아직 캡처가 없어요. 카메라로 첫 생각을 붙잡아 보세요.</div>`;
+    return `<div class="hint-empty">아직 캡처가 없어요. 캡처 화면에서 첫 생각을 붙잡아 보세요.</div>`;
   }
 
   return () => urls.forEach((u) => URL.revokeObjectURL(u));
