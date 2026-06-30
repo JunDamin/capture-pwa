@@ -42,6 +42,7 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
     const chipEls = Array.from(root.querySelectorAll(".chip[data-why]")) as HTMLElement[];
     const writeChip = root.querySelector(".chip--write") as HTMLElement;
     const free = root.querySelector(".sheet__free") as HTMLTextAreaElement;
+    const pageInput = root.querySelector(".sheet__page") as HTMLInputElement;
     const saveBtn = root.querySelector(".btn-save") as HTMLButtonElement;
     const done = root.querySelector(".done") as HTMLElement;
     const hud = root.querySelector(".hud") as HTMLElement;
@@ -168,6 +169,9 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
         exportStatus: "none",
       };
 
+      const pageNum = parseInt(pageInput.value, 10);
+      if (Number.isFinite(pageNum) && pageNum > 0) rec.page = pageNum;
+
       await addCapture(rec);
       const captureMs = captureSw.stop();
       count += 1;
@@ -229,6 +233,7 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
       tagEls.forEach((t) => t.classList.remove("is-sel"));
       chipEls.forEach((c) => c.classList.remove("is-sel"));
       free.value = "";
+      pageInput.value = "";
       free.style.display = "none";
       hint.textContent = "책 페이지를 담고 셔터를 누르세요";
       if (freezeUrl) {
@@ -243,7 +248,8 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
 
 function template(session: Session, bookTitle: string, startCount: number) {
   const tags = TAGS.map(
-    (t) => `<button class="tag" data-tag="${t.key}" aria-label="${t.label}">${t.emoji}</button>`,
+    (t) =>
+      `<button class="tag" data-tag="${t.key}" aria-label="${t.label}">${t.emoji}<span class="tag__l">${t.label}</span></button>`,
   ).join("");
   const chips = WHY_CHIPS.map((w) => `<button class="chip" data-why="${w}">${w}</button>`).join("");
   const project = session.project ? `<span class="sep">·</span> 🎯 ${esc(session.project)}` : "";
@@ -277,6 +283,7 @@ function template(session: Session, bookTitle: string, startCount: number) {
         ${chips}
         <button class="chip chip--write">직접 입력…</button>
       </div>
+      <input class="sheet__page" type="number" inputmode="numeric" min="1" placeholder="페이지(선택)" />
       <textarea class="sheet__free" rows="2" placeholder="왜 저장했는지 한 줄" style="display:none"></textarea>
       <button class="btn-primary btn-save">저장</button>
     </div>

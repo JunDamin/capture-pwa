@@ -45,6 +45,7 @@ export interface Capture {
   memo: string | null;
   tag: Tag; // 필수, 단일 — ADR-002/004
   why: string | null; // 선택 — ADR-004
+  page?: number; // 책 페이지 번호 — 선택(사후 입력 가능)
   ocr: string | null;
   exportStatus: "none" | "exported";
 }

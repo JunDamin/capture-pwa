@@ -66,6 +66,14 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         if (chosen) renderProject();
       };
     });
+
+    root.querySelectorAll<HTMLElement>(".bookrow__edit").forEach((el) => {
+      el.onclick = (ev) => {
+        ev.stopPropagation();
+        const book = books.find((b) => b.uuid === el.dataset.edit) ?? null;
+        if (book) renderEdit(book);
+      };
+    });
   }
 
   function renderProject() {
@@ -105,6 +113,45 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     };
   }
 
+  function renderEdit(book: Book) {
+    root.innerHTML = `
+    <div class="scr scr--light books">
+      <div class="topbar">
+        <button class="iconbtn back">‹</button>
+        <div class="topbar__t">책 편집</div>
+      </div>
+
+      <div class="card form">
+        <input class="field e-title" placeholder="책 제목" autocomplete="off" value="${esc(book.title)}" />
+        <input class="field e-author" placeholder="저자 (선택)" autocomplete="off" value="${esc(book.author ?? "")}" />
+        <input class="field e-isbn" placeholder="ISBN (선택)" autocomplete="off" value="${esc(book.isbn ?? "")}" />
+        <button class="btn-primary save">저장</button>
+      </div>
+    </div>`;
+
+    (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
+    const titleEl = root.querySelector(".e-title") as HTMLInputElement;
+    const authorEl = root.querySelector(".e-author") as HTMLInputElement;
+    const isbnEl = root.querySelector(".e-isbn") as HTMLInputElement;
+    titleEl.oninput = () => titleEl.classList.remove("field--err");
+    (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
+      const title = titleEl.value.trim();
+      if (!title) {
+        titleEl.focus();
+        titleEl.classList.add("field--err");
+        return;
+      }
+      await putBook({
+        ...book,
+        title,
+        author: authorEl.value.trim() || undefined,
+        isbn: isbnEl.value.trim() || undefined,
+      });
+      books = await listBooks();
+      renderList();
+    };
+  }
+
   return () => {};
 }
 
@@ -116,6 +163,7 @@ function bookRow(b: Book) {
       <div class="item__t">${esc(b.title)}</div>
       ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}
     </div>
+    <button class="bookrow__edit" data-edit="${b.uuid}" aria-label="책 편집">✎</button>
     <div class="chev">›</div>
   </div>`;
 }
