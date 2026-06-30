@@ -218,3 +218,22 @@
   - `isValidCapture`가 `passage`를 세 번째 콘텐츠 조건으로 받는다.
   - UI: 사진 모드에서 note 입력 가능(why 대체); 입력 모드에서 passage + note 각각 입력.
   - 레거시 호환: `Capture.why?`를 읽는 코드(Review, Export, 상세 화면)는 `why`를 `note`(memo)로 병합해 표시하면 기존 데이터가 그대로 보인다.
+
+---
+
+## ADR-015 — 이미지 IDB 저장은 ArrayBuffer(Blob 금지) — iOS IDB-Blob 버그 회피
+
+- **상태:** 확정 (2026-06-30)
+- **맥락:** iPhone 실기기 진단으로 근본 원인 확정: iOS Safari는 IndexedDB에 저장한 Blob을 나중에 읽을 때 `NotFoundError: The object can not be found here.`를 던진다(레코드는 남되 바이트가 사라지는 알려진 WebKit 버그). Android(Blink)는 정상. 이것이 Export PDF에 사진이 안 들어가던 진짜 원인이었다. ADR-003의 "Blob으로 저장" 방침이 iOS에서 깨진다.
+- **결정:**
+  - IndexedDB에 이미지를 **ArrayBuffer로 저장**(Blob 직접 저장 금지). iOS는 ArrayBuffer를 안정적으로 보관한다.
+  - 변환은 **`src/db/db.ts` 경계에 격리**: 저장 시 `toStored(Capture) → { ...c, image: ArrayBuffer, imageType: string }`, 읽기 시 `fromStored(rec) → Capture(image: Blob)`.
+  - 소비자(screens, lib/) 코드는 계속 `Capture.image: Blob | null`을 받아 **변경 없음**.
+  - 옛 Blob 레코드(Android 기존 데이터)는 `fromStored`가 그대로 통과시켜 **양방향 호환** 유지.
+- **ADR-003 개정 메모:** "Blob으로 저장" → "ArrayBuffer로 저장, 읽기 시 Blob 재구성"으로 개정.
+- **함의:**
+  - `addCapture`/`updateCapture`: `await toStored(c)` 후 put. 반환값은 원래 `Capture`(소비자 불변).
+  - `getCapture`: `fromStored` 적용.
+  - `capturesForSession`/`allCaptures`: 결과 배열에 `.map(fromStored)` 적용.
+  - iOS 기존 사진: 이미 못 읽으므로 복구 불가 — 신규 캡처부터 정상.
+  - 용량 변화 없음(base64 33% 비대 없이 ArrayBuffer 직접 저장).

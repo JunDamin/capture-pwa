@@ -1,6 +1,36 @@
-/** IndexedDB 저장소 — PRD §12. 서버/로그인 없음. 이미지는 Blob(ADR-003). */
+/** IndexedDB 저장소 — PRD §12. 서버/로그인 없음. 이미지는 ArrayBuffer(ADR-015, ADR-003 개정). */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
 import type { Book, Capture, Session } from "./types.ts";
+
+// --- iOS IDB-Blob 버그 회피 (ADR-015) ---
+// iOS Safari가 저장된 Blob을 나중에 읽지 못함(NotFoundError). ArrayBuffer는 안정적.
+// 저장 경계에서만 변환 — 소비자는 계속 Blob을 받는다.
+
+async function blobToBuf(b: Blob): Promise<ArrayBuffer> {
+  if (typeof b.arrayBuffer === "function") return b.arrayBuffer();
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result as ArrayBuffer);
+    r.onerror = () => rej(r.error);
+    r.readAsArrayBuffer(b);
+  });
+}
+
+async function toStored(c: Capture): Promise<unknown> {
+  if (c.image instanceof Blob) {
+    const buf = await blobToBuf(c.image);
+    return { ...c, image: buf, imageType: c.image.type || "image/jpeg" };
+  }
+  return c; // image null
+}
+
+function fromStored(rec: unknown): Capture {
+  const r = rec as Record<string, unknown>;
+  if (r && r.image instanceof ArrayBuffer) {
+    return { ...r, image: new Blob([r.image], { type: (r.imageType as string) || "image/jpeg" }) } as Capture;
+  }
+  return rec as Capture; // 옛 Blob 레코드(Android) 또는 image null → 그대로
+}
 
 interface CaptureDB extends DBSchema {
   books: { key: string; value: Book };
@@ -58,19 +88,20 @@ export async function getSession(id: string) {
 
 // --- Captures ---
 export async function addCapture(c: Capture) {
-  await (await db()).put("captures", c);
+  await (await db()).put("captures", await toStored(c) as Capture);
   return c;
 }
 export async function getCapture(id: string): Promise<Capture | undefined> {
-  return (await db()).get("captures", id);
+  const rec = await (await db()).get("captures", id);
+  return rec == null ? undefined : fromStored(rec);
 }
 export async function updateCapture(c: Capture) {
-  await (await db()).put("captures", c);
+  await (await db()).put("captures", await toStored(c) as Capture);
   return c;
 }
 export async function capturesForSession(sessionId: string): Promise<Capture[]> {
   const list = await (await db()).getAllFromIndex("captures", "bySession", sessionId);
-  return list.sort((a, b) => a.createdAt - b.createdAt);
+  return list.map(fromStored).sort((a, b) => a.createdAt - b.createdAt);
 }
 export async function countCaptures(sessionId: string): Promise<number> {
   return (await db()).countFromIndex("captures", "bySession", sessionId);
@@ -87,7 +118,8 @@ export async function allSessions(): Promise<Session[]> {
   return (await db()).getAll("sessions");
 }
 export async function allCaptures(): Promise<Capture[]> {
-  return (await db()).getAll("captures");
+  const list = await (await db()).getAll("captures");
+  return list.map(fromStored);
 }
 
 export async function sessionsForBook(bookId: string): Promise<Session[]> {
