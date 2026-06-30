@@ -10,6 +10,7 @@ import {
 import type { Capture } from "../db/types.ts";
 import { buildExport, type ExportContext, type ExportPackage } from "../lib/prompt.ts";
 import { canShareFiles, copyText, downloadFile, shareFiles } from "../lib/share.ts";
+import { buildPdf } from "../lib/pdf.ts";
 
 export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
   root.innerHTML = `<div class="scr scr--light"><div class="loading">패키지 만드는 중…</div></div>`;
@@ -34,12 +35,10 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       caps = await capturesForBook(id);
       ctx = { bookTitle: book?.title ?? "(책)", author: book?.author, scopeLabel: "이 책 전체", captures: caps };
     }
-    render(buildExport(ctx), caps, ctx.bookTitle);
+    render(buildExport(ctx), caps, ctx.bookTitle, ctx);
   })();
 
-  function render(pkg: ExportPackage, caps: Capture[], title: string) {
-    const shareable = canShareFiles(pkg.files);
-
+  function render(pkg: ExportPackage, caps: Capture[], title: string, ctx: ExportContext) {
     root.innerHTML = `
     <div class="scr scr--light export">
       <div class="topbar">
@@ -60,10 +59,9 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         </div>
       </div>
 
-      <button class="btn-primary share">${shareable ? "📲 공유하기 (prompt.md + 사진)" : "📲 공유 미지원 — 아래로 진행"}</button>
+      <button class="btn-primary topdf">📄 PDF로 내보내기 (AI에게 넘기기)</button>
       <div class="exp__alt">
         <button class="btn-ghost copy">📋 프롬프트 복사</button>
-        <button class="btn-ghost dl">⬇︎ 파일 내려받기</button>
       </div>
 
       <div class="card card--list">
@@ -84,27 +82,43 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     (root.querySelector(".back") as HTMLElement).onclick = () =>
       nav({ name: "review", scope, id });
 
-    (root.querySelector(".share") as HTMLButtonElement).onclick = async () => {
-      const r = await shareFiles(pkg.files, `독서 캡처 — ${title}`);
-      if (r === "shared") {
-        await markExported(caps);
-        flash("공유했어요");
-      } else if (r === "cancelled") {
-        /* 사용자가 닫음 — 조용히 */
-      } else if (r === "unsupported") {
-        flash("이 기기는 파일 공유 미지원 — 복사/다운로드를 쓰세요");
-      } else {
-        flash("공유 중 문제가 생겼어요");
+    (root.querySelector(".topdf") as HTMLButtonElement).onclick = async () => {
+      const btn = root.querySelector(".topdf") as HTMLButtonElement;
+      btn.disabled = true;
+      const label = btn.textContent;
+      btn.textContent = "PDF 만드는 중…";
+      try {
+        const safe = title.replace(/[^\p{L}\p{N}._-]+/gu, "_").slice(0, 40);
+        const name = `독서캡처-${safe}-${scope === "session" ? "세션" : "책"}.pdf`;
+        const blob = await buildPdf(ctx);
+        const file = { name, blob };
+        if (canShareFiles([file])) {
+          const r = await shareFiles([file], `독서 캡처 — ${title}`);
+          if (r === "shared") {
+            await markExported(caps);
+            flash("공유했어요");
+          } else if (r === "unsupported") {
+            downloadFile(file);
+            flash("PDF를 내려받아요");
+          } else if (r !== "cancelled") {
+            flash("공유 중 문제가 생겼어요");
+          }
+        } else {
+          downloadFile(file);
+          await markExported(caps);
+          flash("PDF를 내려받아요");
+        }
+      } catch (e) {
+        console.error("buildPdf failed", e);
+        flash("PDF를 만들지 못했어요");
+      } finally {
+        btn.disabled = false;
+        btn.textContent = label;
       }
     };
 
     (root.querySelector(".copy") as HTMLButtonElement).onclick = async () => {
       flash((await copyText(pkg.promptMd)) ? "프롬프트를 복사했어요" : "복사에 실패했어요");
-    };
-
-    (root.querySelector(".dl") as HTMLButtonElement).onclick = () => {
-      pkg.files.forEach(downloadFile);
-      flash(`${pkg.files.length}개 파일을 내려받아요`);
     };
   }
 
