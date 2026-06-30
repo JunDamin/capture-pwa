@@ -67,6 +67,15 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         }
       </div>
 
+      ${
+        scope === "session"
+          ? `<div class="card-modes">
+          <button class="cm-btn" data-mode="photo">📷 사진</button>
+          <button class="cm-btn" data-mode="input">✍️ 입력</button>
+        </div>`
+          : ""
+      }
+
       ${caps.length === 0 ? emptyState() : ""}
 
       ${
@@ -155,10 +164,6 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     if (scope === "session") {
       return `<div class="hint-empty">
         <p>아직 캡처가 없어요. 첫 생각을 붙잡아 보세요.</p>
-        <div class="card-modes">
-          <button class="cm-btn" data-mode="photo">📷 사진</button>
-          <button class="cm-btn" data-mode="input">✍️ 입력</button>
-        </div>
       </div>`;
     }
     return `<div class="hint-empty">아직 캡처가 없어요. 캡처 화면에서 첫 생각을 붙잡아 보세요.</div>`;

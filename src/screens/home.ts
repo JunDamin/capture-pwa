@@ -79,9 +79,8 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     });
   }
 
-  function handleSessionTap(sessionId: string, isOpen: boolean) {
-    if (isOpen) nav({ name: "capture", sessionId });
-    else nav({ name: "review", scope: "session", id: sessionId });
+  function handleSessionTap(sessionId: string, _isOpen: boolean) {
+    nav({ name: "review", scope: "session", id: sessionId });
   }
 
   function topCard(v: SessionView, _cta: string, isOpen: boolean) {
