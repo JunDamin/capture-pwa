@@ -7,15 +7,6 @@ export interface ViewerOptions {
   onCrop?: (blob: Blob, width: number, height: number) => void;
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("image load failed"));
-    img.src = url;
-  });
-}
-
 export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
   const url = URL.createObjectURL(image);
   const overlay = document.createElement("div");
@@ -30,6 +21,7 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
 
   let iw = 0;
   let ih = 0;
+  let closed = false; // M3: guard double close
   let baseScale = 1;
   let userScale = 1;
   let ox = 0; // 이미지 좌상단 화면 x
@@ -131,6 +123,8 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
 
   // --- 닫기 ---
   function close() {
+    if (closed) return; // M3: idempotent
+    closed = true;
     URL.revokeObjectURL(url);
     overlay.remove();
   }
@@ -145,8 +139,11 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
       const sy0 = Math.max(0, (0 - oy) / eff);
       const sx1 = Math.min(iw, (vw() - ox) / eff);
       const sy1 = Math.min(ih, (vh() - oy) / eff);
-      const sw = Math.round(sx1 - sx0);
-      const sh = Math.round(sy1 - sy0);
+      // M2: round each edge independently so right/bottom never exceeds image bounds by a pixel
+      const sx = Math.round(sx0);
+      const sy = Math.round(sy0);
+      const sw = Math.round(sx1) - sx;
+      const sh = Math.round(sy1) - sy;
       if (sw <= 0 || sh <= 0) return;
       const long = Math.max(sw, sh);
       const scale = long > MAX_EDGE ? MAX_EDGE / long : 1;
@@ -157,7 +154,7 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
       canvas.height = oh;
       const g = canvas.getContext("2d");
       if (!g) return;
-      g.drawImage(imgEl, Math.round(sx0), Math.round(sy0), sw, sh, 0, 0, ow, oh);
+      g.drawImage(imgEl, sx, sy, sw, sh, 0, 0, ow, oh);
       const blob: Blob | null = await new Promise((res) =>
         canvas.toBlob((b) => res(b), "image/jpeg", QUALITY),
       );
@@ -166,15 +163,14 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
     };
   }
 
-  // --- 이미지 로드 후 fit ---
-  loadImage(url)
-    .then((img) => {
-      iw = img.naturalWidth || img.width;
-      ih = img.naturalHeight || img.height;
-      imgEl.src = url;
-      fit();
-    })
-    .catch(() => {
-      close();
-    });
+  // --- 이미지 로드: imgEl에 직접 — M4: 이중 디코드 제거(iOS 메모리) ---
+  imgEl.onload = () => {
+    iw = imgEl.naturalWidth;
+    ih = imgEl.naturalHeight;
+    fit();
+  };
+  imgEl.onerror = () => {
+    close();
+  };
+  imgEl.src = url;
 }
