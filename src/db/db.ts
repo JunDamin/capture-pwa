@@ -110,6 +110,21 @@ export async function deleteCapture(id: string) {
   await (await db()).delete("captures", id);
 }
 
+/** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. */
+export async function deleteSession(sessionId: string): Promise<void> {
+  const caps = await capturesForSession(sessionId);
+  const d = await db();
+  for (const c of caps) await d.delete("captures", c.uuid);
+  await d.delete("sessions", sessionId);
+}
+
+/** 책 삭제 — 그 책의 모든 세션(+캡처) 삭제 후 책 레코드 삭제. */
+export async function deleteBook(bookId: string): Promise<void> {
+  const sessions = await sessionsForBook(bookId);
+  for (const s of sessions) await deleteSession(s.uuid);
+  await (await db()).delete("books", bookId);
+}
+
 // --- 목록/세션 라이프사이클 (ADR-005) ---
 export async function listBooks(): Promise<Book[]> {
   return (await db()).getAll("books");
