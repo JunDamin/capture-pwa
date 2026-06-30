@@ -1,4 +1,5 @@
 /** prompt.md 본문 + 사진을 단일 PDF로. 한글은 canvas 렌더(Pretendard)로 — jsPDF 폰트 임베딩 회피. ADR-008. */
+import { jsPDF } from "jspdf";
 import { buildExport, type ExportContext } from "./prompt.ts";
 import { TAGS, type Capture } from "../db/types.ts";
 
@@ -87,7 +88,18 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   await ensureFont();
   const promptMd = buildExport(ctx).promptMd;
   const captures = ctx.captures;
-  const pages: HTMLCanvasElement[] = [];
+
+  // 페이지를 쌓아두지 않고 하나씩 즉시 PDF에 넣고 canvas 백킹스토어를 해제한다.
+  // (iOS Safari 메모리: 3200px 사진 다수 + 누적 canvas → 이미지 디코드 실패 onerror 방지)
+  const doc = new jsPDF({ unit: "px", format: [W, H], orientation: "portrait" });
+  let pageIndex = 0;
+  const addPage = (canvas: HTMLCanvasElement) => {
+    if (pageIndex > 0) doc.addPage([W, H], "portrait");
+    doc.addImage(canvas.toDataURL("image/jpeg", 0.85), "JPEG", 0, 0, W, H);
+    pageIndex++;
+    canvas.width = 0;
+    canvas.height = 0;
+  };
 
   // --- 텍스트 페이지: 프롬프트 본문 ---
   let pg = blank();
@@ -99,7 +111,7 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   setBody();
   for (const ln of wrap(pg.g, promptMd, W - M * 2)) {
     if (y > H - M) {
-      pages.push(pg.c);
+      addPage(pg.c);
       pg = blank();
       setBody();
       y = M;
@@ -124,7 +136,7 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
       y += LINE;
     }
   }
-  pages.push(pg.c);
+  addPage(pg.c);
 
   // --- 사진 페이지: 사진 있는 캡처마다 ---
   for (let i = 0; i < captures.length; i++) {
@@ -146,6 +158,7 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     const dw = iw * scale;
     const dh = ih * scale;
     p.g.drawImage(img, (W - dw) / 2, M + 70, dw, dh);
+    img.src = ""; // 디코드된 소스 이미지 즉시 해제(iOS 메모리)
 
     let cy = M + 70 + availH + 24;
     p.g.fillStyle = INK;
@@ -173,15 +186,8 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
         cy += 36;
       }
     }
-    pages.push(p.c);
+    addPage(p.c);
   }
 
-  // --- jsPDF 조립 (동적 import) ---
-  const { jsPDF } = await import("jspdf");
-  const doc = new jsPDF({ unit: "px", format: [W, H], orientation: "portrait" });
-  pages.forEach((c, i) => {
-    if (i > 0) doc.addPage([W, H], "portrait");
-    doc.addImage(c.toDataURL("image/jpeg", 0.85), "JPEG", 0, 0, W, H);
-  });
   return doc.output("blob");
 }
