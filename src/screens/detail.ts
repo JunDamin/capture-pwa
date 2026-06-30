@@ -1,7 +1,7 @@
 /** 캡처 상세 + 편집 — 큰 사진 + 태그/왜/메모/페이지 수정. PRD §8, ADR-004. */
 import type { Nav, Scope } from "../app.ts";
 import { getCapture, updateCapture } from "../db/db.ts";
-import { TAGS, WHY_CHIPS, isValidCapture, type Capture, type Tag } from "../db/types.ts";
+import { TAGS, isValidCapture, type Capture, type Tag } from "../db/types.ts";
 import { openImageViewer } from "../lib/viewer.ts";
 
 export function mountDetail(
@@ -23,16 +23,10 @@ export function mountDetail(
 
   function render(cap: Capture) {
     let tag: Tag = cap.tag;
-    let why: string | null | undefined = cap.why;
-    let freeMode = why != null && !WHY_CHIPS.includes(why as never);
 
     const tagPills = TAGS.map(
       (t) =>
         `<button class="tagpill ${t.key === tag ? "is-sel" : ""}" data-tag="${t.key}">${t.emoji} ${t.label}</button>`,
-    ).join("");
-    const whyChips = WHY_CHIPS.map(
-      (w) =>
-        `<button class="chip ${!freeMode && why === w ? "is-sel" : ""}" data-why="${w}">${esc(w)}</button>`,
     ).join("");
 
     const d = new Date(cap.createdAt);
@@ -54,17 +48,13 @@ export function mountDetail(
       </div>
 
       <div class="card">
-        <h2 class="detail__q">왜 저장했나요?</h2>
-        <div class="chips">
-          ${whyChips}
-          <button class="chip chip--write ${freeMode ? "is-sel" : ""}">직접 입력…</button>
-        </div>
-        <textarea class="field detail__free" rows="2" placeholder="왜 저장했는지 한 줄" style="display:${freeMode ? "block" : "none"}">${freeMode ? esc(why ?? "") : ""}</textarea>
+        <div class="card__h">담은 글</div>
+        <textarea class="field detail__passage" rows="3" placeholder="책에서 담고 싶은 글 (선택)">${esc(cap.passage ?? "")}</textarea>
       </div>
 
       <div class="card">
-        <div class="card__h">메모</div>
-        <textarea class="field detail__memo" rows="3" placeholder="메모 (선택)">${esc(cap.memo ?? "")}</textarea>
+        <div class="card__h">내 생각</div>
+        <textarea class="field detail__memo" rows="3" placeholder="내 생각·메모 (선택)">${esc([cap.memo, cap.why].filter((s)=>s&&s.trim()).join(" · "))}</textarea>
       </div>
 
       <div class="card detail__pagerow">
@@ -106,11 +96,9 @@ export function mountDetail(
 
     (root.querySelector(".back") as HTMLElement).onclick = back;
 
-    const free = root.querySelector(".detail__free") as HTMLTextAreaElement;
+    const passageEl = root.querySelector(".detail__passage") as HTMLTextAreaElement;
     const memo = root.querySelector(".detail__memo") as HTMLTextAreaElement;
     const pageEl = root.querySelector(".detail__page") as HTMLInputElement;
-    const writeChip = root.querySelector(".chip--write") as HTMLElement;
-    const chipEls = Array.from(root.querySelectorAll(".chip[data-why]")) as HTMLElement[];
     const tagEls = Array.from(root.querySelectorAll(".tagpill")) as HTMLElement[];
 
     tagEls.forEach((el) => {
@@ -120,41 +108,16 @@ export function mountDetail(
       };
     });
 
-    chipEls.forEach((el) => {
-      el.onclick = () => {
-        const v = el.dataset.why!;
-        const already = el.classList.contains("is-sel");
-        chipEls.forEach((c) => c.classList.remove("is-sel"));
-        writeChip.classList.remove("is-sel");
-        free.style.display = "none";
-        freeMode = false;
-        if (already) {
-          why = null;
-        } else {
-          el.classList.add("is-sel");
-          why = v;
-        }
-      };
-    });
-    writeChip.onclick = () => {
-      chipEls.forEach((c) => c.classList.remove("is-sel"));
-      writeChip.classList.add("is-sel");
-      free.style.display = "block";
-      free.focus();
-      freeMode = true;
-    };
-
     (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
+      const passageVal = passageEl.value.trim() || null;
       const memoVal = memo.value.trim() || null;
-      const whyVal = freeMode ? free.value.trim() || null : why;
       const n = parseInt(pageEl.value, 10);
       const page = Number.isFinite(n) && n > 0 ? n : undefined;
-
-      if (!isValidCapture({ image: cap.image, passage: cap.passage, memo: memoVal, tag })) {
-        alert("사진이나 메모 중 하나는 있어야 해요.");
+      if (!isValidCapture({ image: cap.image, passage: passageVal, memo: memoVal, tag })) {
+        alert("담고 싶은 글이나 사진이 필요해요.");
         return;
       }
-      await updateCapture({ ...cap, tag, why: whyVal, memo: memoVal, page, updatedAt: Date.now() });
+      await updateCapture({ ...cap, tag, passage: passageVal, memo: memoVal, why: null, page, updatedAt: Date.now() });
       back();
     };
   }
