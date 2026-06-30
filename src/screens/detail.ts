@@ -23,7 +23,7 @@ export function mountDetail(
 
   function render(cap: Capture) {
     let tag: Tag = cap.tag;
-    let why: string | null = cap.why;
+    let why: string | null | undefined = cap.why;
     let freeMode = why != null && !WHY_CHIPS.includes(why as never);
 
     const tagPills = TAGS.map(
@@ -150,7 +150,7 @@ export function mountDetail(
       const n = parseInt(pageEl.value, 10);
       const page = Number.isFinite(n) && n > 0 ? n : undefined;
 
-      if (!isValidCapture({ image: cap.image, memo: memoVal, tag })) {
+      if (!isValidCapture({ image: cap.image, passage: cap.passage, memo: memoVal, tag })) {
         alert("사진이나 메모 중 하나는 있어야 해요.");
         return;
       }
