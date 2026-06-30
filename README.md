@@ -20,6 +20,7 @@
 npm install
 npm run dev      # http://localhost:5173 (카메라는 localhost/https 필요)
 npm run build    # 타입체크 + 프로덕션 빌드
+npm run test:pdf # PDF 생성 스모크(chromium) — iOS Safari는 실기기로 확인
 ```
 
 캡처 화면 좌상단의 **예산 HUD**가 카메라 웜업·캡처 완료·압축·용량을 실측한다 (목표: 웜업 ≤1s, 캡처 ≤3s — PRD §16).
