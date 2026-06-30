@@ -243,7 +243,8 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
 
 function template(session: Session, bookTitle: string, startCount: number) {
   const tags = TAGS.map(
-    (t) => `<button class="tag" data-tag="${t.key}" aria-label="${t.label}">${t.emoji}</button>`,
+    (t) =>
+      `<button class="tag" data-tag="${t.key}" aria-label="${t.label}">${t.emoji}<span class="tag__l">${t.label}</span></button>`,
   ).join("");
   const chips = WHY_CHIPS.map((w) => `<button class="chip" data-why="${w}">${w}</button>`).join("");
   const project = session.project ? `<span class="sep">·</span> 🎯 ${esc(session.project)}` : "";
