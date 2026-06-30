@@ -35,22 +35,26 @@ export async function deleteBook(bookId: string): Promise<void> {
   await (await db()).delete("books", bookId);
 }
 ```
-- `sessionsForBook(bookId)`가 없으면 `byBook` 인덱스로 조회하는 헬퍼를 추가(기존 인덱스 확인 후). 캡처는 ArrayBuffer 레코드라 레코드 삭제로 정리됨.
+- **확인됨(검토):** `sessionsForBook`(db.ts:125, `getAllFromIndex("sessions","byBook",bookId)`)·`capturesForBook`(db.ts:129)·`byBook` 인덱스(db.ts:57)가 **이미 존재** → 스키마/버전 변경 불필요. `deleteSession`/`deleteBook`만 새로 추가.
+- idb `db.delete()`는 호출마다 자동 트랜잭션 → 루프 내 await 안전(과거 TransactionInactiveError 위험 없음). 캡처는 ArrayBuffer 레코드라 레코드 삭제로 정리됨.
 
 ### 2. `src/screens/review.ts` — 세션 삭제 + 책 전체 전달 버튼 (session scope)
 
 - **세션 삭제:** 화면 하단에 절제된 위험 액션 "이 세션 삭제"(`.danger-link` 텍스트 버튼, 빨강 아님—무채+위험은 confirm으로). 클릭 → `confirm("이 세션의 캡처 N개가 모두 지워집니다. 삭제할까요?")` → `deleteSession(id)` → `nav({name:"home"})`.
-- **책 전체 전달(B):** 기존 "이 책 전체 보기"(→ review(book)) 옆/근처에 **"📤 이 책 전체 AI 전달"** → `nav({name:"export", scope:"book", id:bookId})`.
+  - **조정(검토):** 이 링크는 **`caps.length === 0`(빈 세션)일 때도 보여야** 함 — 현재 Export 버튼은 `caps.length > 0` 가드 안에 있으니, 삭제 링크는 그 가드 **밖**에 렌더(빈/잘못 만든 세션도 삭제 가능).
+- **책 전체 전달(B):** 기존 "이 책 전체 보기"(→ review(book), `.scopebtn.toBook`) 근처에 **"📤 이 책 전체 AI 전달"** → `nav({name:"export", scope:"book", id:bookId})`. (route는 이미 `scope:"book"` 지원 — app.ts/export.ts 변경 불필요.)
+  - **조정(검토):** `.hero`는 블록 흐름(flex 아님) → 두 `.scopebtn`은 세로 스택이 기본(안전). 가로 배치를 원하면 `display:flex; gap:8px` 래퍼로 — 구현자 판단(스택 기본).
 - book scope Review에는 세션 삭제 없음(거긴 책 단위).
 
 ### 3. `src/screens/books.ts` — 책 삭제 (목록)
 
-- 책 목록 각 행에 이미 편집(✎, `data-edit`)이 있음 → 그 옆에 **삭제(🗑 또는 "삭제")** 추가(`data-del=bookId`). 탭타깃 ≥44px, 행 탭(책 선택)과 `stopPropagation`으로 분리.
+- 책 목록 각 행에 이미 편집(`.bookrow__edit`, `data-edit`)이 있음 → 그 옆에 **삭제(🗑 또는 "삭제")** 추가(`data-del=bookId`). 행 탭(책 선택)과 `stopPropagation`으로 분리(기존 edit 버튼과 동일 패턴).
+  - **조정(검토):** `.bookrow__edit`에 명시적 크기 CSS가 없음 → 새 삭제 버튼은 **`min-width:44px; min-height:44px`를 명시**(인접 패턴이 알아서 해주리라 가정 금지).
 - 클릭 → `confirm("'제목'과 이 책의 모든 세션·캡처가 지워집니다. 삭제할까요?")` → `deleteBook(id)` → 목록 재렌더.
 
 ### 4. `src/styles/app.css` — C: Export 버튼 높이 + 삭제 액션 스타일
 
-- `.topdf`(또는 `.export .btn-primary`)가 표준 CTA 높이를 갖게(다른 `.btn-primary`와 동일, 예: `min-height: 52px; padding`). 원인이 `.review .export` 등 상속 규칙이면 그 규칙 보정. 구현자가 현 CSS 확인 후 표준화.
+- **C 진짜 원인(검토):** `.topdf`는 `.btn-primary { height: 56px }`(app.css:257)를 받는데, flex 컬럼(`.scr`) 안에서 **iOS Safari flex-shrink로 압축**될 수 있음. `.topdf` 전용/`.review .export` 규칙은 **원인 아님**. → **`.btn-primary`의 `height: 56px` → `min-height: 56px`로**(전 CTA 견고화) + `.topdf { margin-top: 4px }`(시각 간격, `.review .export`의 margin-top:6px와 정합). margin만 추가하지 말 것 — min-height가 핵심.
 - `.danger-link`(세션 삭제), 책 목록 `.book-del` 버튼 스타일(절제, ≥44px). 토스-클린 유지.
 
 ## 디자인 언어 / 제약
