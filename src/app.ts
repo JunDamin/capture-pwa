@@ -5,6 +5,7 @@ import { mountCapture } from "./screens/capture.ts";
 import { mountReview } from "./screens/review.ts";
 import { mountExport } from "./screens/export.ts";
 import { mountDetail } from "./screens/detail.ts";
+import { mountTransfer } from "./screens/transfer.ts";
 
 export type Scope = "session" | "book";
 
@@ -14,7 +15,8 @@ export type Route =
   | { name: "capture"; sessionId: string }
   | { name: "review"; scope: Scope; id: string }
   | { name: "export"; scope: Scope; id: string }
-  | { name: "detail"; captureId: string; from: { scope: Scope; id: string } };
+  | { name: "detail"; captureId: string; from: { scope: Scope; id: string } }
+  | { name: "transfer" };
 
 export type Nav = (route: Route) => void;
 
@@ -46,6 +48,9 @@ export function mountApp(root: HTMLElement) {
         break;
       case "detail":
         cleanup = mountDetail(root, nav, route.captureId, route.from);
+        break;
+      case "transfer":
+        cleanup = mountTransfer(root, nav);
         break;
     }
   };

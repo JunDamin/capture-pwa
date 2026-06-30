@@ -83,6 +83,12 @@ export async function deleteCapture(id: string) {
 export async function listBooks(): Promise<Book[]> {
   return (await db()).getAll("books");
 }
+export async function allSessions(): Promise<Session[]> {
+  return (await db()).getAll("sessions");
+}
+export async function allCaptures(): Promise<Capture[]> {
+  return (await db()).getAll("captures");
+}
 
 export async function sessionsForBook(bookId: string): Promise<Session[]> {
   return (await db()).getAllFromIndex("sessions", "byBook", bookId);

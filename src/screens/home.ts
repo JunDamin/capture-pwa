@@ -46,10 +46,14 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
              <div class="recent">${rest.map(recentItem).join("")}</div>`
           : ""
       }
+      <button class="home__transfer">백업·가져오기</button>
     </div>`;
 
     const startBtn = root.querySelector(".home__start") as HTMLButtonElement;
     startBtn.onclick = () => nav({ name: "books" });
+
+    (root.querySelector(".home__transfer") as HTMLButtonElement).onclick = () =>
+      nav({ name: "transfer" });
 
     const topEl = root.querySelector(".bookcard[data-action]") as HTMLElement | null;
     if (topEl) topEl.onclick = () => handleSessionTap(topEl.dataset.id!, topEl.dataset.open === "1");
