@@ -181,14 +181,14 @@
 - 결정: `orientation: "any"`로 변경해 가로를 허용한다. PWA에서 방향을 풀면 OS가 전 화면을 회전시키므로, 카메라+사진 표시는 가로 레이아웃을 정돈하고 나머지 화면은 콘텐츠 max-width로 "깨지지 않는" 수준까지만 보장한다.
 - 영향: 카메라 화면은 여전히 유일한 다크 풀블리드(가로에서도 유지). image.ts는 이미 긴 변 기준이라 변경 없음.
 
-## ADR-013: iOS Safari 호환 — 이미지 디코딩은 `Image`+`decode()` (createImageBitmap 금지)
+## ADR-013: iOS Safari 호환 — 이미지 로드는 `Image`+`onload` (createImageBitmap·decode() 금지)
 
 - **상태:** 확정 (2026-06-30)
-- **맥락(실기기 버그):** Export 단일 PDF 기능 배포 후, **iPhone Safari에서 "PDF 받기" → "생성할 수 없습니다"** 로 실패. 그런데 헤드리스 chromium(Playwright)에서 `buildPdf`를 재현하면 **정상**(유효 PDF Blob 생성). 즉 Blink는 통과, **WebKit(iOS)에서만 throw**.
-  - 원인: `pdf.ts`가 사진 디코딩에 **`createImageBitmap(blob)`** 사용. 이 API는 **iOS Safari 15~16에서 미지원/버그**가 흔해 throw → catch로 잡혀 일반 실패 토스트만 떴다.
-  - 검증 제약: 이 개발 환경에서 **WebKit을 직접 실행 불가**(libgtk-4 등 시스템 라이브러리 다수 누락). 그래서 로컬에서 iOS 동작을 재현/확정할 수 없었고, 고확률 원인 수정 + 온디바이스 확인으로 분리했다.
+- **맥락(실기기 버그, 2회 반복):** Export 단일 PDF 기능 배포 후, **iPhone Safari에서 "PDF 받기" → 실패**. 헤드리스 chromium(Playwright)에서 `buildPdf`를 재현하면 **정상**. 즉 Blink는 통과, **WebKit(iOS)에서만 throw**. 이 개발 환경에선 **WebKit 직접 실행 불가**(libgtk-4 등 시스템 라이브러리 누락)라 로컬 재현 불가 → 실패 토스트에 **실제 에러를 노출**해 온디바이스로 원인을 받아냈다.
+  - **1차 원인:** `createImageBitmap(blob)` — iOS Safari 15~16에서 미지원/버그로 throw.
+  - 1차 수정으로 `Image`+`decode()`로 바꿨더니 → **2차 에러 `EncodingError: Loading error.`** (실기기 토스트로 확인). iOS Safari는 **blob URL 이미지에 대해 `img.decode()`가 거부하는 WebKit 버그**가 있다(실제로는 `onload`로 정상 로드됨 — 앱의 상세/리뷰 화면이 같은 blob을 object URL로 이미 잘 표시).
 - **결정:**
-  - 이미지 디코딩은 `createImageBitmap` 대신 **`Image` + `await img.decode()`**(iOS 11+, 전 브라우저 호환; decode 미지원 시 `onload` 폴백)를 쓴다. (`src/lib/pdf.ts`의 `loadImage`)
+  - 이미지 로드는 `createImageBitmap`도 `decode()`도 쓰지 않고 **`Image` + `onload`/`onerror`** 만 쓴다(가장 호환성 높음). (`src/lib/pdf.ts`의 `loadImage`)
   - PDF 등 사용자 트리거 실패는 **실제 에러 메시지를 토스트에 노출**해 온디바이스 자가 진단이 되게 한다.
   - **iOS 전용 동작은 실기기로 검증**한다. 헤드리스 chromium 스모크(`npm run test:pdf`)는 총체적 깨짐을 잡는 **회귀 가드일 뿐 iOS 보증이 아니다**(이번 버그도 chromium은 통과했음).
 - **함의(교훈):**
