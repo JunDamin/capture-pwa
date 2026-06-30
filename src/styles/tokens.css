@@ -1,4 +1,16 @@
 /* Design tokens — see docs/design-language.md (ADR-010, Toss-derived) */
+
+/* Pretendard를 self-host한다. 이전엔 jsdelivr CDN을 탔으나 폐쇄망(예: 공공기관)·오프라인에서
+ * 폰트가 안 떠 시스템 폰트로 폴백됐다. 가변폰트 1개로 전 굵기 커버. Vite가 base 경로로 번들하고
+ * workbox가 프리캐시한다(vite.config의 woff2 glob). */
+@font-face {
+  font-family: "Pretendard";
+  src: url("./fonts/PretendardVariable.woff2") format("woff2-variations");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   --ink: #191f28;
   --sub: #8b95a1;

@@ -31,4 +31,7 @@ npm run build    # 타입체크 + 프로덕션 빌드
 
 ## 상태
 
-마일스톤 1 (캡처 루프) 구현 완료. Home / 세션 관리 / Review / Export는 진행 예정 — [PRD §18 로드맵](PRD.md) 참고.
+MVP 전체 흐름 완료 — Home · 세션 관리 · 캡처 루프 · Review · Export 구현·배포됨.
+라이브: https://jundamin.github.io/capture-pwa/ (설치형 PWA, 오프라인 동작)
+
+다음 마일스톤은 [PRD §18 로드맵](PRD.md) 참고.
