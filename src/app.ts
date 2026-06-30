@@ -12,7 +12,7 @@ export type Scope = "session" | "book";
 export type Route =
   | { name: "home" }
   | { name: "books" }
-  | { name: "capture"; sessionId: string }
+  | { name: "capture"; sessionId: string; mode?: "photo" | "input" }
   | { name: "review"; scope: Scope; id: string }
   | { name: "export"; scope: Scope; id: string }
   | { name: "detail"; captureId: string; from: { scope: Scope; id: string } }
@@ -38,7 +38,7 @@ export function mountApp(root: HTMLElement) {
         cleanup = mountBooks(root, nav);
         break;
       case "capture":
-        cleanup = mountCapture(root, nav, route.sessionId);
+        cleanup = mountCapture(root, nav, route.sessionId, route.mode);
         break;
       case "review":
         cleanup = mountReview(root, nav, route.scope, route.id);

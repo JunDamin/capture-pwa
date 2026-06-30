@@ -91,6 +91,11 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         <label class="proj__label">왜 이 책을 읽나요? <span class="opt">선택</span></label>
         <input class="field project" placeholder="예: 지방교육 프로젝트" autocomplete="off" />
         <div class="proj__hint">목적은 캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
+        <label class="proj__label">시작 모드</label>
+        <div class="mode-toggle mode-toggle--light proj__modesel">
+          <button class="mode-btn mode-btn--photo is-active" aria-label="사진 모드">📷 사진</button>
+          <button class="mode-btn mode-btn--input" aria-label="입력 모드">✍️ 입력</button>
+        </div>
         <button class="btn-primary start">세션 시작</button>
       </div>
     </div>`;
@@ -98,6 +103,21 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
     const projEl = root.querySelector(".project") as HTMLInputElement;
     projEl.focus();
+
+    let selectedMode: "photo" | "input" = "photo";
+    const modeBtnPhoto = root.querySelector(".mode-btn--photo") as HTMLButtonElement;
+    const modeBtnInput = root.querySelector(".mode-btn--input") as HTMLButtonElement;
+    modeBtnPhoto.onclick = () => {
+      selectedMode = "photo";
+      modeBtnPhoto.classList.add("is-active");
+      modeBtnInput.classList.remove("is-active");
+    };
+    modeBtnInput.onclick = () => {
+      selectedMode = "input";
+      modeBtnInput.classList.add("is-active");
+      modeBtnPhoto.classList.remove("is-active");
+    };
+
     (root.querySelector(".start") as HTMLButtonElement).onclick = async () => {
       const now = Date.now();
       await endAllOpenSessions(now); // 다른 책으로 시작 시 이전 세션 종료(ADR-005)
@@ -109,7 +129,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         ended: null,
       };
       await putSession(session);
-      nav({ name: "capture", sessionId: session.uuid });
+      nav({ name: "capture", sessionId: session.uuid, mode: selectedMode });
     };
   }
 
