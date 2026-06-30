@@ -899,3 +899,8 @@
   bottom: calc(16px + var(--safe-bottom));
   width: min(100% - 40px, 600px);
 }
+
+.sheet__page {
+  width: 100%;
+  margin-bottom: 10px;
+}
