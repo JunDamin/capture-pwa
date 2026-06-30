@@ -4,9 +4,6 @@ const LS_KEY = "capture.cropFrame";
 const DEFAULT_RECT: CropRect = { x: 0.06, y: 0.25, w: 0.88, h: 0.38 };
 const MIN = 0.08;
 
-// 뷰파인더 크기 캐시 — 드래그 중 clientWidth/clientHeight 호출 방지
-let vw = 0, vh = 0;
-
 export function loadCropRect(): CropRect {
   try {
     const raw = localStorage.getItem(LS_KEY);
@@ -32,6 +29,8 @@ export interface CropFrame { getRect(): CropRect; destroy(): void }
 
 export function mountCropFrame(camEl: HTMLElement): CropFrame {
   let rect = loadCropRect();
+  // 뷰파인더 크기 캐시(인스턴스별) — 드래그 중 clientWidth/clientHeight 호출 방지
+  let vw = 0, vh = 0;
   // 오버레이 DOM: 박스 + 4 마스크 + 8 핸들(4모서리·4변) + 3분할 그리드
   const overlay = document.createElement("div");
   overlay.className = "cropframe";
