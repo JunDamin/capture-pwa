@@ -57,11 +57,24 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
   // --- Pointer Events: 팬 + 핀치 ---
   const pts = new Map<number, { x: number; y: number }>();
   let pinch: { dist: number; cx: number; cy: number } | null = null;
+  // 더블탭 판별용: 현재 제스처의 최대 동시 포인터 수, 첫 손가락 시작 위치
+  let maxPointers = 0;
+  let tapStartX = 0;
+  let tapStartY = 0;
 
   overlay.addEventListener("pointerdown", (e) => {
     if ((e.target as HTMLElement).closest("button")) return;
     overlay.setPointerCapture(e.pointerId);
+    const wasEmpty = pts.size === 0;
     pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (wasEmpty) {
+      // 새 제스처 시작: 최대 포인터 수·탭 시작 위치 초기화
+      maxPointers = 1;
+      tapStartX = e.clientX;
+      tapStartY = e.clientY;
+    } else {
+      maxPointers = Math.max(maxPointers, pts.size);
+    }
     if (pts.size === 2) pinch = startPinch();
   });
   overlay.addEventListener("pointermove", (e) => {
@@ -109,16 +122,22 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
     apply();
   }
 
-  // 더블탭/더블클릭 줌 토글
+  // 더블탭 줌 토글 — 핀치 끝/드래그 끝과 오인되지 않도록 세 조건을 모두 검사:
+  //   1) maxPointers===1: 이번 제스처 내내 손가락이 하나였을 것 (핀치 배제)
+  //   2) moved<10px: 손가락이 거의 움직이지 않았을 것 (팬 배제)
+  //   3) pts.size===0: 모든 손가락이 떨어졌을 것
   let lastTap = 0;
   overlay.addEventListener("pointerup", (e) => {
     if ((e.target as HTMLElement).closest("button")) return;
+    // endPointer가 먼저 등록됐으므로 이 시점에 pts는 이미 갱신된 상태
     const now = e.timeStamp;
-    if (now - lastTap < 300) {
+    const moved = Math.hypot(e.clientX - tapStartX, e.clientY - tapStartY);
+    const isTap = maxPointers === 1 && moved < 10 && pts.size === 0;
+    if (isTap && now - lastTap < 300) {
       const target = userScale > 1 ? 1 : 2.5;
       zoomAt(e.clientX, e.clientY, target / userScale);
     }
-    lastTap = now;
+    if (isTap) lastTap = now;
   });
 
   // --- 닫기 ---

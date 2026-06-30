@@ -85,6 +85,8 @@ export function mountDetail(
 
     const photoEl = root.querySelector(".detail__photo") as HTMLElement;
     if (cap.image) {
+      photoEl.title = "탭하면 확대";
+      photoEl.setAttribute("aria-label", "탭하면 확대");
       photoEl.onclick = () => {
         if (!cap.image) return;
         openImageViewer(cap.image, {

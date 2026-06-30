@@ -842,6 +842,7 @@
   background-repeat: no-repeat;
   border-radius: var(--r-card);
   margin: 4px 0 16px;
+  cursor: pointer;
 }
 .detail__photo--none {
   display: flex;
