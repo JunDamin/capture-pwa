@@ -29,7 +29,9 @@ export interface CropFrame { getRect(): CropRect; destroy(): void }
 
 export function mountCropFrame(camEl: HTMLElement): CropFrame {
   let rect = loadCropRect();
-  // 오버레이 DOM: 박스 + 4 마스크 + 8 핸들(4모서리·4변)
+  // 뷰파인더 크기 캐시(인스턴스별) — 드래그 중 clientWidth/clientHeight 호출 방지
+  let vw = 0, vh = 0;
+  // 오버레이 DOM: 박스 + 4 마스크 + 8 핸들(4모서리·4변) + 3분할 그리드
   const overlay = document.createElement("div");
   overlay.className = "cropframe";
   overlay.innerHTML = `
@@ -37,6 +39,12 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
     <div class="cropframe__mask cf-left"></div><div class="cropframe__mask cf-right"></div>
     <div class="cropframe__box">
       ${["nw","n","ne","e","se","s","sw","w"].map((h) => `<div class="cropframe__handle h-${h}" data-h="${h}"></div>`).join("")}
+      <div class="cropframe__grid">
+        <div class="cf-vline cf-v1"></div>
+        <div class="cf-vline cf-v2"></div>
+        <div class="cf-hline cf-h1"></div>
+        <div class="cf-hline cf-h2"></div>
+      </div>
     </div>`;
   camEl.appendChild(overlay);
   const box = overlay.querySelector(".cropframe__box") as HTMLElement;
@@ -46,8 +54,7 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
   const mRight = overlay.querySelector(".cf-right") as HTMLElement;
 
   function render() {
-    const W = camEl.clientWidth, H = camEl.clientHeight;
-    const l = rect.x * W, t = rect.y * H, w = rect.w * W, h = rect.h * H;
+    const l = rect.x * vw, t = rect.y * vh, w = rect.w * vw, h = rect.h * vh;
     box.style.left = `${l}px`; box.style.top = `${t}px`;
     box.style.width = `${w}px`; box.style.height = `${h}px`;
     mTop.style.cssText = `left:0;top:0;width:100%;height:${t}px`;
@@ -59,6 +66,8 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
   // 포인터: 핸들=resize(반대변 고정), 박스 내부=move. 단일 포인터.
   let mode: "" | "move" | string = "";
   let startX = 0, startY = 0, startRect: CropRect = rect, pid = -1;
+  let capEl: HTMLElement | null = null;
+
   function onDown(e: PointerEvent) {
     const target = e.target as HTMLElement;
     const handle = target.dataset.h;
@@ -66,13 +75,17 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
     else if (target === box) mode = "move";
     else return;
     pid = e.pointerId; startX = e.clientX; startY = e.clientY; startRect = { ...rect };
-    overlay.setPointerCapture?.(pid);
+    // 포인터다운 시 뷰파인더 치수 갱신 (드래그 중 레이아웃 읽기 방지)
+    vw = camEl.clientWidth; vh = camEl.clientHeight;
+    // 실제 pointer-events:auto 대상에 캡처 — overlay(pointer-events:none)에 걸면 iOS에서 누락
+    capEl = target;
+    capEl.setPointerCapture?.(e.pointerId);
     e.preventDefault(); e.stopPropagation();
   }
   function onMove(e: PointerEvent) {
     if (mode === "" || e.pointerId !== pid) return;
-    const W = camEl.clientWidth, H = camEl.clientHeight;
-    const dx = (e.clientX - startX) / W, dy = (e.clientY - startY) / H;
+    // vw/vh 캐시 사용 — 드래그 중 clientWidth/clientHeight 호출 없음
+    const dx = (e.clientX - startX) / vw, dy = (e.clientY - startY) / vh;
     let { x, y, w, h } = startRect;
     if (mode === "move") { x = startRect.x + dx; y = startRect.y + dy; }
     else {
@@ -89,19 +102,26 @@ export function mountCropFrame(camEl: HTMLElement): CropFrame {
   }
   function onUp(e: PointerEvent) {
     if (e.pointerId !== pid) return;
+    capEl?.releasePointerCapture?.(pid);
+    capEl = null;
     mode = ""; pid = -1; saveCropRect(rect);
+  }
+  function onResize() {
+    vw = camEl.clientWidth; vh = camEl.clientHeight;
+    render();
   }
   overlay.addEventListener("pointerdown", onDown);
   overlay.addEventListener("pointermove", onMove);
   overlay.addEventListener("pointerup", onUp);
   overlay.addEventListener("pointercancel", onUp);
-  window.addEventListener("resize", render);
+  window.addEventListener("resize", onResize);
+  vw = camEl.clientWidth; vh = camEl.clientHeight;
   render();
 
   return {
     getRect: () => rect,
     destroy: () => {
-      window.removeEventListener("resize", render);
+      window.removeEventListener("resize", onResize);
       overlay.remove();
     },
   };
