@@ -147,6 +147,15 @@ export async function endAllOpenSessions(now: number, exceptId?: string) {
   }
 }
 
+/** 새 세션 시작 — 기존 열린 세션 종료 후 생성(ADR-005). 새 세션 uuid 반환. */
+export async function startNewSession(bookId: string, project?: string): Promise<string> {
+  const now = Date.now();
+  await endAllOpenSessions(now);
+  const session: Session = { uuid: uuid(), bookId, project, started: now, ended: null };
+  await putSession(session);
+  return session.uuid;
+}
+
 /** 비활동 자동 종료 — 마지막 활동 후 maxIdleMs 경과한 열린 세션을 닫는다(ADR-005). */
 export async function endStaleSessions(now: number, maxIdleMs = 8 * 60 * 60 * 1000) {
   const open = (await (await db()).getAll("sessions")).filter((s) => s.ended == null);

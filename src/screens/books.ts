@@ -1,10 +1,9 @@
 /** 책 선택 / 새 책 등록 → 세션 시작. PRD §8-A, ADR-005/006. */
 import type { Nav } from "../app.ts";
 import {
-  endAllOpenSessions,
   listBooks,
   putBook,
-  putSession,
+  startNewSession,
   uuid,
 } from "../db/db.ts";
 import type { Book } from "../db/types.ts";
@@ -119,17 +118,8 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     };
 
     (root.querySelector(".start") as HTMLButtonElement).onclick = async () => {
-      const now = Date.now();
-      await endAllOpenSessions(now); // 다른 책으로 시작 시 이전 세션 종료(ADR-005)
-      const session = {
-        uuid: uuid(),
-        bookId: chosen!.uuid,
-        project: projEl.value.trim() || undefined,
-        started: now,
-        ended: null,
-      };
-      await putSession(session);
-      nav({ name: "capture", sessionId: session.uuid, mode: selectedMode });
+      const sid = await startNewSession(chosen!.uuid, projEl.value.trim() || undefined);
+      nav({ name: "capture", sessionId: sid, mode: selectedMode });
     };
   }
 

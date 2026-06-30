@@ -7,6 +7,7 @@ import {
   getBook,
   getSession,
   putSession,
+  startNewSession,
 } from "../db/db.ts";
 import { TAGS, type Capture, type Session } from "../db/types.ts";
 
@@ -105,6 +106,16 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       };
     }
 
+    // 빈 상태 캡처 시작 버튼 (session-scope only)
+    root.querySelectorAll<HTMLElement>(".card-modes .cm-btn").forEach((btn) => {
+      btn.onclick = async () => {
+        if (!session) return;
+        const mode = btn.dataset.mode as "photo" | "input";
+        const id = session.ended == null ? session.uuid : await startNewSession(session.bookId);
+        nav({ name: "capture", sessionId: id, mode });
+      };
+    });
+
     // 썸네일 주입 + 삭제
     caps.forEach((c) => {
       const el = root.querySelector(`.capcard[data-id="${c.uuid}"]`) as HTMLElement | null;
@@ -141,6 +152,15 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   }
 
   function emptyState() {
+    if (scope === "session") {
+      return `<div class="hint-empty">
+        <p>아직 캡처가 없어요. 첫 생각을 붙잡아 보세요.</p>
+        <div class="card-modes">
+          <button class="cm-btn" data-mode="photo">📷 사진</button>
+          <button class="cm-btn" data-mode="input">✍️ 입력</button>
+        </div>
+      </div>`;
+    }
     return `<div class="hint-empty">아직 캡처가 없어요. 캡처 화면에서 첫 생각을 붙잡아 보세요.</div>`;
   }
 
