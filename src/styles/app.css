@@ -915,3 +915,7 @@
 .bookrow__edit:active {
   background: var(--surface);
 }
+
+.review__editproj {
+  margin-left: auto;
+}

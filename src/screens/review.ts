@@ -6,8 +6,9 @@ import {
   deleteCapture,
   getBook,
   getSession,
+  putSession,
 } from "../db/db.ts";
-import { TAGS, WHY_CHIPS, type Capture } from "../db/types.ts";
+import { TAGS, WHY_CHIPS, type Capture, type Session } from "../db/types.ts";
 
 export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
   const urls: string[] = [];
@@ -15,12 +16,14 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
 
   let bookId = "";
   let title = "";
+  let session: Session | null = null;
 
   (async () => {
     let caps: Capture[];
     if (scope === "session") {
       const s = await getSession(id);
       if (!s) return nav({ name: "home" });
+      session = s;
       bookId = s.bookId;
       const book = await getBook(s.bookId);
       title = book?.title ?? "(책)";
@@ -54,6 +57,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       <div class="topbar">
         <button class="iconbtn back">‹</button>
         <div class="topbar__t">${esc(title)}</div>
+        ${scope === "session" ? `<button class="iconbtn review__editproj" aria-label="세션 목적 편집">✎</button>` : ""}
       </div>
 
       <div class="hero">
@@ -99,6 +103,18 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     if (toBook) toBook.onclick = () => nav({ name: "review", scope: "book", id: bookId });
     const exportBtn = root.querySelector(".export") as HTMLElement | null;
     if (exportBtn) exportBtn.onclick = () => nav({ name: "export", scope, id });
+
+    const editProj = root.querySelector(".review__editproj") as HTMLElement | null;
+    if (editProj && session) {
+      editProj.onclick = () => {
+        const cur = session!.project ?? "";
+        const next = prompt("왜 이 책을 읽나요?", cur);
+        if (next === null) return;
+        const project = next.trim() || undefined;
+        session = { ...session!, project };
+        putSession(session).then(() => render(caps));
+      };
+    }
 
     // 썸네일 주입 + 삭제
     caps.forEach((c) => {
