@@ -84,6 +84,39 @@ async function loadImage(blob: Blob): Promise<HTMLImageElement> {
   }
 }
 
+interface DecodedImage {
+  src: CanvasImageSource;
+  w: number;
+  h: number;
+  close: () => void;
+}
+
+/**
+ * PDF용 이미지 디코드. iOS는 RAM이 적어 3200px 풀 디코드(~30MB)가 실패한다(onerror).
+ * createImageBitmap의 resizeWidth로 **축소 디코드**(긴 변 ~maxEdge)해 메모리를 1/6 이하로.
+ * createImageBitmap이 안 되는 환경은 Image+onload(풀 디코드)로 폴백.
+ */
+async function decodeForPdf(blob: Blob, maxEdge: number): Promise<DecodedImage> {
+  if (typeof createImageBitmap === "function") {
+    try {
+      // resizeWidth만 지정 → 종횡비 유지하며 width를 maxEdge로 축소(스펙). 둘 다 주면 왜곡됨.
+      const bmp = await createImageBitmap(blob, { resizeWidth: maxEdge, resizeQuality: "high" });
+      return { src: bmp, w: bmp.width, h: bmp.height, close: () => bmp.close?.() };
+    } catch {
+      /* 폴백: Image+onload 풀 디코드 */
+    }
+  }
+  const img = await loadImage(blob);
+  return {
+    src: img,
+    w: img.naturalWidth || img.width,
+    h: img.naturalHeight || img.height,
+    close: () => {
+      img.src = "";
+    },
+  };
+}
+
 export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   await ensureFont();
   const promptMd = buildExport(ctx).promptMd;
@@ -151,22 +184,20 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
 
     const availW = W - M * 2;
     const availH = H - (M + 70) - 320;
-    // 한 장이 실패해도(iOS 메모리 압박으로 Image onerror 등) PDF 전체가 깨지지 않게
-    // 장별로 격리: 실패 시 그 캡처는 "사진 없이 텍스트만" 페이지로.
-    let img: HTMLImageElement | null = null;
+    // iOS RAM 절약을 위해 축소 디코드(decodeForPdf). 한 장이 실패해도 PDF 전체가
+    // 깨지지 않게 장별 격리 — 실패 시 그 캡처는 "사진 없이 텍스트만" 페이지로.
+    let dec: DecodedImage | null = null;
     try {
-      img = await loadImage(cap.image);
+      dec = await decodeForPdf(cap.image, 1400);
     } catch {
-      img = null;
+      dec = null;
     }
-    if (img) {
-      const iw = img.naturalWidth || img.width;
-      const ih = img.naturalHeight || img.height;
-      const scale = Math.min(availW / iw, availH / ih);
-      const dw = iw * scale;
-      const dh = ih * scale;
-      p.g.drawImage(img, (W - dw) / 2, M + 70, dw, dh);
-      img.src = ""; // 디코드된 소스 이미지 즉시 해제(iOS 메모리)
+    if (dec) {
+      const scale = Math.min(availW / dec.w, availH / dec.h);
+      const dw = dec.w * scale;
+      const dh = dec.h * scale;
+      p.g.drawImage(dec.src, (W - dw) / 2, M + 70, dw, dh);
+      dec.close(); // 디코드 소스 즉시 해제(iOS 메모리)
     } else {
       p.g.fillStyle = SUB;
       p.g.font = "400 28px Pretendard";
