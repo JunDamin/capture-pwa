@@ -61,6 +61,9 @@ export async function addCapture(c: Capture) {
   await (await db()).put("captures", c);
   return c;
 }
+export async function getCapture(id: string): Promise<Capture | undefined> {
+  return (await db()).get("captures", id);
+}
 export async function updateCapture(c: Capture) {
   await (await db()).put("captures", c);
   return c;
