@@ -4,6 +4,7 @@ import {
   capturesForBook,
   capturesForSession,
   deleteCapture,
+  deleteSession,
   getBook,
   getSession,
   putSession,
@@ -62,7 +63,8 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         <div class="hero__scope">${scopeLabel}</div>
         ${
           scope === "session"
-            ? `<button class="scopebtn toBook">이 책 전체 보기 ›</button>`
+            ? `<button class="scopebtn toBook">이 책 전체 보기 ›</button>
+        <button class="scopebtn toBookExport">📤 이 책 전체 AI 전달</button>`
             : ""
         }
       </div>
@@ -95,6 +97,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       `
           : ""
       }
+      ${scope === "session" ? `<button class="danger-link sessiondel">이 세션 삭제</button>` : ""}
     </div>`;
 
     (root.querySelector(".back") as HTMLElement).onclick = () => nav({ name: "home" });
@@ -102,6 +105,17 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     if (toBook) toBook.onclick = () => nav({ name: "review", scope: "book", id: bookId });
     const exportBtn = root.querySelector(".export") as HTMLElement | null;
     if (exportBtn) exportBtn.onclick = () => nav({ name: "export", scope, id });
+
+    const beEl = root.querySelector(".toBookExport") as HTMLButtonElement | null;
+    if (beEl) beEl.onclick = () => nav({ name: "export", scope: "book", id: bookId });
+
+    const sdEl = root.querySelector(".sessiondel") as HTMLButtonElement | null;
+    if (sdEl) sdEl.onclick = async () => {
+      const n = caps.length;
+      if (!confirm(`이 세션의 캡처 ${n}개가 모두 지워집니다. 삭제할까요?`)) return;
+      await deleteSession(id);
+      nav({ name: "home" });
+    };
 
     const editProj = root.querySelector(".review__editproj") as HTMLElement | null;
     if (editProj && session) {

@@ -1,6 +1,8 @@
 /** 책 선택 / 새 책 등록 → 세션 시작. PRD §8-A, ADR-005/006. */
 import type { Nav } from "../app.ts";
 import {
+  capturesForBook,
+  deleteBook,
   listBooks,
   putBook,
   startNewSession,
@@ -71,6 +73,19 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         ev.stopPropagation();
         const book = books.find((b) => b.uuid === el.dataset.edit) ?? null;
         if (book) renderEdit(book);
+      };
+    });
+
+    root.querySelectorAll<HTMLElement>(".bookrow__del").forEach((el) => {
+      el.onclick = async (ev) => {
+        ev.stopPropagation();
+        const id = el.dataset.del!;
+        const b = books.find((x) => x.uuid === id);
+        const caps = await capturesForBook(id);
+        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 세션·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
+        await deleteBook(id);
+        books = await listBooks();
+        renderList();
       };
     });
   }
@@ -174,6 +189,7 @@ function bookRow(b: Book) {
       ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}
     </div>
     <button class="bookrow__edit" data-edit="${b.uuid}" aria-label="책 편집">✎</button>
+    <button class="bookrow__del" data-del="${b.uuid}" aria-label="책 삭제">🗑</button>
     <div class="chev">›</div>
   </div>`;
 }
