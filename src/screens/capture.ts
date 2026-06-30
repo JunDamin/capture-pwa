@@ -6,7 +6,8 @@
  */
 import type { Nav } from "../app.ts";
 import { startCamera, stopCamera } from "../camera/camera.ts";
-import { grabFrame, resizeCompress } from "../lib/image.ts";
+import { cropResizeCompress } from "../lib/image.ts";
+import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
 import { addCapture, countCaptures, getBook, getSession, uuid } from "../db/db.ts";
 import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../db/types.ts";
@@ -21,6 +22,9 @@ export function mountCapture(
   initialMode: Mode = "photo",
 ): () => void {
   root.innerHTML = `<div class="cam"><div class="cam__boot">준비 중…</div></div>`;
+
+  let cropFrame: CropFrame | null = null;
+  let freezeCanvas: HTMLCanvasElement | null = null;
 
   (async () => {
     const session = await getSession(sessionId);
@@ -74,7 +78,6 @@ export function mountCapture(
 
     // ---- Photo mode state ----
     let phase: Phase = "live";
-    let frame: ImageBitmap | null = null;
     let freezeUrl: string | null = null;
     let chosenTag: Tag | null = null;
     let count = startCount;
@@ -101,8 +104,11 @@ export function mountCapture(
     async function startCam() {
       hint.textContent = "카메라 준비 중…";
       hud.innerHTML = "";
+      cropFrame?.destroy();
+      cropFrame = null;
       try {
         const { warmupMs } = await startCamera(video);
+        cropFrame = mountCropFrame(cam);
         hud.innerHTML = hudChip("warmup", warmupMs, BUDGET.warmupMs);
         hint.textContent = "책 페이지를 담고 셔터를 누르세요";
       } catch (e) {
@@ -155,15 +161,11 @@ export function mountCapture(
       if (phase !== "live") return;
       captureSw.reset();
       const shutterSw = new Stopwatch();
-      try {
-        frame = await grabFrame(video);
-      } catch {
-        frame = null;
-      }
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext("2d")?.drawImage(video, 0, 0);
+      freezeCanvas = canvas;
       canvas.toBlob(
         (b) => {
           if (b) {
@@ -228,7 +230,9 @@ export function mountCapture(
       const pageNum = parseInt(pageInput.value, 10);
       if (Number.isFinite(pageNum) && pageNum > 0) rec.page = pageNum;
 
-      if (!frame && !memoVal) return;
+      if (!freezeCanvas && !memoVal) return;
+      // 캔버스 ref를 먼저 캡처 — resetToLive()가 freezeCanvas를 null로 초기화하기 전에
+      const pendingCanvas = freezeCanvas;
       await addCapture(rec);
       const captureMs = captureSw.stop();
       count += 1;
@@ -236,17 +240,28 @@ export function mountCapture(
 
       closeSheet();
       showDone();
-      resetToLive();
+      resetToLive(); // freezeCanvas = null 포함
 
       const appMs = shutterMs + saveSw.stop();
       const humanMs = Math.max(0, captureMs - appMs);
 
       let compressMs = 0;
       let sizeKB = 0;
-      if (frame) {
+      if (pendingCanvas) {
+        const vW = pendingCanvas.width, vH = pendingCanvas.height;
+        const elW = cam.clientWidth || vW, elH = cam.clientHeight || vH;
+        const r = cropFrame ? cropFrame.getRect() : { x: 0, y: 0, w: 1, h: 1 };
+        let cropPx: { sx: number; sy: number; sw: number; sh: number };
+        if (vW > 0 && vH > 0) {
+          const scale = Math.max(elW / vW, elH / vH);
+          const offX = (vW * scale - elW) / 2, offY = (vH * scale - elH) / 2;
+          cropPx = { sx: (r.x * elW + offX) / scale, sy: (r.y * elH + offY) / scale, sw: (r.w * elW) / scale, sh: (r.h * elH) / scale };
+        } else {
+          cropPx = { sx: 0, sy: 0, sw: vW, sh: vH };
+        }
         const compSw = new Stopwatch();
         try {
-          const { blob, width, height } = await resizeCompress(frame);
+          const { blob, width, height } = await cropResizeCompress(pendingCanvas, vW, vH, cropPx);
           compressMs = compSw.stop();
           sizeKB = blob.size / 1024;
           rec.image = blob;
@@ -257,8 +272,8 @@ export function mountCapture(
         } catch {
           /* 이미지 실패해도 메타 캡처는 유효 */
         }
-        frame.close?.();
-        frame = null;
+        pendingCanvas.width = 0;
+        pendingCanvas.height = 0; // iOS 캔버스 메모리 즉시 해제(CLAUDE.md)
       }
 
       record({ captureMs, appMs, humanMs, compressMs, sizeKB });
@@ -359,11 +374,16 @@ export function mountCapture(
         URL.revokeObjectURL(freezeUrl);
         freezeUrl = null;
       }
+      freezeCanvas = null;
     }
   }
 
   // Cleanup: always stop camera (safe even if camera was never started)
-  return () => stopCamera();
+  return () => {
+    stopCamera();
+    cropFrame?.destroy();
+    cropFrame = null;
+  };
 }
 
 function template(session: Session, bookTitle: string, startCount: number, initialMode: Mode) {

@@ -30,6 +30,9 @@
 .cam.is-frozen .cam__freeze {
   display: block;
 }
+/* 입력 모드에서 크롭 프레임 숨김 */
+.cam.mode--input .cropframe { display: none; }
+
 .cam__scrim {
   position: absolute;
   inset: 0;
@@ -1386,3 +1389,15 @@
   margin: 8px 0 4px;
   font-variant-numeric: tabular-nums;
 }
+
+/* ---- 크롭 프레임 오버레이 (라이브 카메라 위) ---- */
+.cropframe { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
+.cropframe__mask { position: absolute; background: rgba(0,0,0,0.28); pointer-events: none; }
+.cropframe__box { position: absolute; border: 1.5px solid rgba(255,255,255,0.95); box-sizing: border-box; pointer-events: auto; }
+.cropframe__handle { position: absolute; width: 44px; height: 44px; pointer-events: auto; }
+.cropframe__handle::after { content: ""; position: absolute; inset: 16px; border: 2px solid #fff; border-radius: 2px; }
+.cropframe__handle.h-nw { left: -22px; top: -22px; } .cropframe__handle.h-n { left: 50%; top: -22px; transform: translateX(-50%); }
+.cropframe__handle.h-ne { right: -22px; top: -22px; } .cropframe__handle.h-e { right: -22px; top: 50%; transform: translateY(-50%); }
+.cropframe__handle.h-se { right: -22px; bottom: -22px; } .cropframe__handle.h-s { left: 50%; bottom: -22px; transform: translateX(-50%); }
+.cropframe__handle.h-sw { left: -22px; bottom: -22px; } .cropframe__handle.h-w { left: -22px; top: 50%; transform: translateY(-50%); }
+.cam.is-frozen .cropframe { display: none; }
