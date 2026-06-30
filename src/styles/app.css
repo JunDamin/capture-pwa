@@ -920,6 +920,8 @@
 
 .review__editproj {
   margin-left: auto;
+  min-width: 48px;
+  min-height: 48px;
 }
 
 /* --- 가로(landscape) — 카메라+사진 집중 --- */
