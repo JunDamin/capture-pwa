@@ -553,6 +553,34 @@
 .home__start {
   margin-bottom: 28px;
 }
+
+/* 카드 모드 버튼 스트립 (홈 topCard + recentItem) */
+.card-modes {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+}
+.cm-btn {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 12px;
+  background: #fff;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 700;
+  border: 1.5px solid #e5e8eb;
+  transition: background 0.12s ease, transform 0.1s ease;
+}
+.cm-btn:active {
+  background: var(--surface);
+  transform: scale(0.97);
+}
+.bookcard .card-modes {
+  margin-top: 16px;
+}
+.recent .item .card-modes {
+  margin-top: 8px;
+}
 .emptycard {
   background: var(--surface);
   border-radius: 20px;
@@ -585,13 +613,18 @@
 }
 .recent .item {
   display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 12px 4px;
+  flex-direction: column;
+  padding: 10px 4px 6px;
 }
 .recent .item:active {
   background: var(--surface);
   border-radius: 12px;
+}
+.item__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 48px;
 }
 .item__body {
   flex: 1;

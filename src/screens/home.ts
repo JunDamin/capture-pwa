@@ -1,6 +1,6 @@
 /** Home — 지금 읽는 책(이어읽기) + 최근 세션 + 독서 시작. PRD §8-A, 토스 라이트. */
 import type { Nav } from "../app.ts";
-import { openSession, recentSessions, type SessionView } from "../db/db.ts";
+import { openSession, recentSessions, startNewSession, type SessionView } from "../db/db.ts";
 
 function relTime(ts: number): string {
   const days = Math.floor((startOfDay(Date.now()) - startOfDay(ts)) / 86400000);
@@ -64,6 +64,19 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     root.querySelectorAll<HTMLElement>(".recent .item").forEach((el) => {
       el.onclick = () => handleSessionTap(el.dataset.id!, el.dataset.open === "1");
     });
+
+    root.querySelectorAll<HTMLElement>(".card-modes .cm-btn").forEach((btn) => {
+      btn.onclick = async (ev) => {
+        ev.stopPropagation();
+        const card = btn.closest("[data-id]") as HTMLElement;
+        const sessionId = card.dataset.id!;
+        const bookId = card.dataset.book!;
+        const isOpen = card.dataset.open === "1";
+        const mode = btn.dataset.mode as "photo" | "input";
+        const id = isOpen ? sessionId : await startNewSession(bookId);
+        nav({ name: "capture", sessionId: id, mode });
+      };
+    });
   }
 
   function handleSessionTap(sessionId: string, isOpen: boolean) {
@@ -73,7 +86,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
 
   function topCard(v: SessionView, _cta: string, isOpen: boolean) {
     return `
-    <div class="bookcard" data-action data-id="${v.session.uuid}" data-open="${isOpen ? 1 : 0}">
+    <div class="bookcard" data-action data-id="${v.session.uuid}" data-open="${isOpen ? 1 : 0}" data-book="${v.session.bookId}">
       <div class="bookcard__row">
         <div class="cover cov-1">${esc(v.bookTitle).slice(0, 6)}</div>
         <div class="bookcard__body">
@@ -85,6 +98,10 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
           </div>
         </div>
         <div class="chev">›</div>
+      </div>
+      <div class="card-modes">
+        <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
+        <button class="cm-btn cm-input" data-mode="input" aria-label="입력으로 캡처">✍️ 입력</button>
       </div>
     </div>`;
   }
@@ -100,13 +117,19 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
 
   function recentItem(v: SessionView, i: number) {
     return `
-    <div class="item" data-id="${v.session.uuid}" data-open="${v.session.ended == null ? 1 : 0}">
-      <div class="mini ${coverClass(i)}"></div>
-      <div class="item__body">
-        <div class="item__t">${esc(v.bookTitle)}</div>
-        <div class="item__s">${v.count} captures${v.session.project ? " · " + esc(v.session.project) : ""}</div>
+    <div class="item" data-id="${v.session.uuid}" data-open="${v.session.ended == null ? 1 : 0}" data-book="${v.session.bookId}">
+      <div class="item__row">
+        <div class="mini ${coverClass(i)}"></div>
+        <div class="item__body">
+          <div class="item__t">${esc(v.bookTitle)}</div>
+          <div class="item__s">${v.count} captures${v.session.project ? " · " + esc(v.session.project) : ""}</div>
+        </div>
+        <div class="item__when">${v.session.ended == null ? "진행 중" : relTime(v.lastActivity)}</div>
       </div>
-      <div class="item__when">${v.session.ended == null ? "진행 중" : relTime(v.lastActivity)}</div>
+      <div class="card-modes">
+        <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
+        <button class="cm-btn cm-input" data-mode="input" aria-label="입력으로 캡처">✍️ 입력</button>
+      </div>
     </div>`;
   }
 
