@@ -5,8 +5,14 @@ import { VitePWA } from "vite-plugin-pwa";
 // 배포 워크플로가 VITE_BASE=/<repo>/ 를 주입한다. 로컬은 "/".
 const base = process.env.VITE_BASE || "/";
 
+// 빌드 시각 스탬프(빌드 타임 Node — 앱 런타임 아님). 화면에 표시해 어떤 버전이 도는지 확인.
+const buildId = new Date().toISOString().slice(5, 16).replace("T", " "); // "MM-DD HH:mm"
+
 export default defineConfig({
   base,
+  define: {
+    __BUILD__: JSON.stringify(buildId),
+  },
   server: { host: true, port: 5173 },
   build: { target: "es2020" },
   plugins: [

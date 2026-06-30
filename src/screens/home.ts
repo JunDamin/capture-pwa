@@ -2,6 +2,8 @@
 import type { Nav } from "../app.ts";
 import { openSession, recentSessions, startNewSession, type SessionView } from "../db/db.ts";
 
+declare const __BUILD__: string; // vite define — 빌드 시각 스탬프
+
 function relTime(ts: number): string {
   const days = Math.floor((startOfDay(Date.now()) - startOfDay(ts)) / 86400000);
   if (days <= 0) return "오늘";
@@ -47,6 +49,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
           : ""
       }
       <button class="home__transfer">백업·가져오기</button>
+      <div class="home__ver">build ${__BUILD__}</div>
     </div>`;
 
     const startBtn = root.querySelector(".home__start") as HTMLButtonElement;

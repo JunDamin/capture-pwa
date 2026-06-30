@@ -1347,3 +1347,13 @@
 .proj__modesel {
   width: 100%;
 }
+
+/* 빌드 버전 스탬프(기기별 갱신 확인용) */
+.home__ver {
+  text-align: center;
+  color: var(--sub);
+  font-size: 11px;
+  opacity: 0.6;
+  margin: 8px 0 4px;
+  font-variant-numeric: tabular-nums;
+}
