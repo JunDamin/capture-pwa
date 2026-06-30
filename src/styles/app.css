@@ -977,3 +977,41 @@
   width: 100%;
   margin-top: 12px;
 }
+
+/* --- 전체화면 이미지 뷰어 --- */
+.viewer {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #000;
+  overflow: hidden;
+  touch-action: none;
+  user-select: none;
+}
+.viewer__img {
+  position: absolute;
+  top: 0;
+  left: 0;
+  will-change: transform;
+  -webkit-user-drag: none;
+}
+.viewer__close {
+  position: fixed;
+  top: calc(12px + var(--safe-top));
+  left: 12px;
+  min-width: 48px;
+  min-height: 48px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  font-size: 20px;
+  z-index: 1001;
+}
+.viewer__crop {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + var(--safe-bottom));
+  width: min(100% - 40px, 480px);
+  z-index: 1001;
+}
