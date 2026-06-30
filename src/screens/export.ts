@@ -110,7 +110,8 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         }
       } catch (e) {
         console.error("buildPdf failed", e);
-        flash("PDF를 만들지 못했어요");
+        const msg = e instanceof Error ? `${e.name}: ${e.message}` : String(e);
+        flash(`PDF를 만들지 못했어요 — ${msg}`);
       } finally {
         btn.disabled = false;
         btn.textContent = label;

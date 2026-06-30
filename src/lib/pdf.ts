@@ -61,6 +61,29 @@ function fmtTime(ts: number): string {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
+/**
+ * Blob을 이미지로 로드. iOS Safari(15~16)의 createImageBitmap 미지원/버그를 피하려
+ * Image + decode()를 쓴다(iOS 11+, 전 브라우저 호환). decode 미지원 시 onload 폴백.
+ */
+async function loadImage(blob: Blob): Promise<HTMLImageElement> {
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  try {
+    img.src = url;
+    if (typeof img.decode === "function") {
+      await img.decode();
+    } else {
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("image load failed"));
+      });
+    }
+    return img;
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}
+
 export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   await ensureFont();
   const promptMd = buildExport(ctx).promptMd;
@@ -115,14 +138,15 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     p.g.font = "700 34px Pretendard";
     p.g.fillText(num, M, M);
 
-    const bmp = await createImageBitmap(cap.image);
+    const img = await loadImage(cap.image);
+    const iw = img.naturalWidth || img.width;
+    const ih = img.naturalHeight || img.height;
     const availW = W - M * 2;
     const availH = H - (M + 70) - 320;
-    const scale = Math.min(availW / bmp.width, availH / bmp.height);
-    const dw = bmp.width * scale;
-    const dh = bmp.height * scale;
-    p.g.drawImage(bmp, (W - dw) / 2, M + 70, dw, dh);
-    bmp.close?.();
+    const scale = Math.min(availW / iw, availH / ih);
+    const dw = iw * scale;
+    const dh = ih * scale;
+    p.g.drawImage(img, (W - dw) / 2, M + 70, dw, dh);
 
     let cy = M + 70 + availH + 24;
     p.g.fillStyle = INK;
