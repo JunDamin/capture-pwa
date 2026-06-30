@@ -30,6 +30,9 @@
 .cam.is-frozen .cam__freeze {
   display: block;
 }
+/* 입력 모드에서 크롭 프레임 숨김 */
+.cam.mode--input .cropframe { display: none; }
+
 .cam__scrim {
   position: absolute;
   inset: 0;
