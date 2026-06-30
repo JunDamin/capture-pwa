@@ -272,6 +272,8 @@ export function mountCapture(
         } catch {
           /* 이미지 실패해도 메타 캡처는 유효 */
         }
+        pendingCanvas.width = 0;
+        pendingCanvas.height = 0; // iOS 캔버스 메모리 즉시 해제(CLAUDE.md)
       }
 
       record({ captureMs, appMs, humanMs, compressMs, sizeKB });
