@@ -109,6 +109,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         urls.push(u);
         (el.querySelector(".capthumb") as HTMLElement).style.backgroundImage = `url(${u})`;
       }
+      el.onclick = () => nav({ name: "detail", captureId: c.uuid, from: { scope, id } });
       (el.querySelector(".capdel") as HTMLElement).onclick = async (ev) => {
         ev.stopPropagation();
         if (!confirm("이 캡처를 삭제할까요?")) return;

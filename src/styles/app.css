@@ -825,3 +825,77 @@
 .pill .cnt {
   cursor: pointer;
 }
+
+/* --- 캡처 상세/편집 --- */
+.detail {
+  padding-bottom: 88px; /* 하단 고정 저장 버튼 공간 */
+}
+.detail__photo {
+  width: 100%;
+  max-height: 56vh;
+  aspect-ratio: 4 / 3;
+  background: var(--surface);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  border-radius: var(--r-card);
+  margin: 4px 0 16px;
+}
+.detail__photo--none {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 40px;
+  aspect-ratio: 16 / 9;
+}
+.tagpills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.tagpill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 44px;
+}
+.tagpill.is-sel {
+  background: var(--primary);
+  color: #fff;
+}
+.detail__q {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+.detail__pagerow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail__pagerow .card__h {
+  margin: 0;
+}
+.detail__page {
+  width: 120px;
+  text-align: right;
+}
+.detail__stamp {
+  color: var(--sub);
+  font-size: 13px;
+  text-align: center;
+  margin: 8px 0 16px;
+  font-variant-numeric: tabular-nums;
+}
+.detail .save {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(16px + var(--safe-bottom));
+  width: min(100% - 40px, 600px);
+}
