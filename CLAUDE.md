@@ -36,7 +36,6 @@ npm run test:pdf  # PDF 생성 스모크(chromium/Playwright) — npx playwright
   - 이미지 로드는 **`Image`+`onload`만** — `createImageBitmap`·`img.decode()` 금지(iOS에서 throw/EncodingError).
   - 큰 라이브러리는 **정적 import** — `await import()` 동적 코드분할 금지(PWA 서비스워커가 옛 청크 해시를 fetch해 "Failed to fetch dynamically imported module"로 깨짐). 예: `pdf.ts`의 jsPDF.
   - iOS 캔버스/이미지 **메모리** 주의 — `pdf.ts`처럼 페이지 canvas를 누적하지 말고 즉시 처리·해제.
-- **외부 CDN 금지(공공망 차단 — KOICA).** 폰트·모델 등 모든 자원을 self-host/번들. Pretendard는 self-host(`src/styles/fonts/`).
 - **캡처 "사진 모드" 3초 루프는 신성하다.** 사진 경로(셔터→태그→note 시트→저장)를 느리게 하거나 포커스를 가로채는 변경 금지. 입력(텍스트) 모드·상세 편집엔 이 예산 미적용.
 - **디자인 언어 = 토스 derived 밝고 깨끗.** 카메라 뷰파인더만 유일한 다크 풀블리드. 무채(잉크 `#191F28`/그레이/화이트) + 파랑 하나 `#3182F6`(색은 카메라·태그 이모지에서만). Pretendard 단일. 하단 풀폭 파랑 CTA. 탭타깃 ≥48px. reduced-motion 존중. 마이크로카피 plain·sentence case, 액션 이름 일관(새 변형 문구 만들지 말 것). 상세: `docs/design-language.md`.
 
