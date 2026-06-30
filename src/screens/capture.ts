@@ -67,6 +67,7 @@ export function mountCapture(
     const inpTagEls = Array.from(root.querySelectorAll(".inp__tagrow .tag")) as HTMLElement[];
     const inpSaveBtn = root.querySelector(".inp__save") as HTMLButtonElement;
     const inpHint = root.querySelector(".inp__hint") as HTMLElement;
+    inpPassage.oninput = () => inpPassage.classList.remove("field--err");
 
     (root.querySelector(".cam__back") as HTMLElement).onclick = () => nav({ name: "home" });
     cntEl.onclick = () => nav({ name: "review", scope: "session", id: session.uuid });
@@ -123,6 +124,7 @@ export function mountCapture(
         modeBtnInput.classList.add("is-active");
         // Reset photo state if mid-capture
         if (phase !== "live") resetToLive();
+        inpPassage.focus();
       } else {
         // Switch to photo mode: start camera
         cam.classList.remove("mode--input");
@@ -226,6 +228,7 @@ export function mountCapture(
       const pageNum = parseInt(pageInput.value, 10);
       if (Number.isFinite(pageNum) && pageNum > 0) rec.page = pageNum;
 
+      if (!frame && !memoVal) return;
       await addCapture(rec);
       const captureMs = captureSw.stop();
       count += 1;
