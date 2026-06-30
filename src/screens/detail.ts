@@ -23,6 +23,7 @@ export function mountDetail(
 
   function render(cap: Capture) {
     let tag: Tag = cap.tag;
+    let lastCropUrl: string | null = null;
 
     const tagPills = TAGS.map(
       (t) =>
@@ -85,8 +86,10 @@ export function mountDetail(
             cap.imageW = w;
             cap.imageH = h;
             await updateCapture({ ...cap, image: blob, imageW: w, imageH: h, updatedAt: Date.now() });
-            // 상세 썸네일 갱신
+            // 상세 썸네일 갱신 — 이전 크롭 URL만 revoke (초기 썸네일은 건드리지 않음)
             const u = URL.createObjectURL(blob);
+            if (lastCropUrl) URL.revokeObjectURL(lastCropUrl);
+            lastCropUrl = u;
             urls.push(u);
             photoEl.style.backgroundImage = `url(${u})`;
           },
