@@ -956,3 +956,24 @@
     min-height: 200px;
   }
 }
+
+.home__transfer {
+  display: block;
+  margin: 28px auto 8px;
+  padding: 10px 16px;
+  min-height: 48px;
+  color: var(--sub);
+  font-size: 14px;
+  font-weight: 600;
+}
+.home__transfer:active {
+  color: var(--ink);
+}
+.transfer .card {
+  margin-bottom: 16px;
+}
+.transfer .btn-primary,
+.transfer .pick {
+  width: 100%;
+  margin-top: 12px;
+}
