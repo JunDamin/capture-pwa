@@ -146,7 +146,6 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     // 사진은 디코드 없이 JPEG를 PDF에 직접 삽입한다(addPage 뒤 doc.addImage). 여기선 dataURL+치수만 준비.
     // 한 장이 실패해도 PDF 전체가 깨지지 않게 장별 격리 — 실패 시 "텍스트만" 페이지.
     let photo: { dataUrl: string; w: number; h: number } | null = null;
-    let photoErr = "";
     try {
       const dataUrl = await blobToDataUrl(cap.image);
       let w = cap.imageW || 0;
@@ -156,22 +155,14 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
         w = props.width;
         h = props.height;
       }
-      const blobType = (cap.image as Blob).type || "?";
       photo = { dataUrl, w, h };
-      // 진단: dataURL prefix(타입)·치수를 작게 남겨 둔다(문제 시 캡션으로 확인).
-      photoErr = `ok ${w}x${h} ${blobType} ${dataUrl.slice(0, 16)}`;
-    } catch (e) {
+    } catch {
       photo = null;
-      photoErr = String((e as Error)?.name || "") + ": " + String((e as Error)?.message || e);
     }
     if (!photo) {
       p.g.fillStyle = SUB;
-      p.g.font = "400 24px Pretendard";
-      let ey = M + 100;
-      for (const ln of wrap(p.g, `(사진 실패) ${photoErr}`, W - M * 2)) {
-        p.g.fillText(ln, M, ey);
-        ey += 32;
-      }
+      p.g.font = "400 28px Pretendard";
+      p.g.fillText("(사진을 불러오지 못했어요 — 텍스트만 포함)", M, M + 100);
     }
 
     let cy = M + 70 + availH + 24;
