@@ -1,4 +1,5 @@
 /** prompt.md 본문 + 사진을 단일 PDF로. 한글은 canvas 렌더(Pretendard)로 — jsPDF 폰트 임베딩 회피. ADR-008. */
+import { jsPDF } from "jspdf";
 import { buildExport, type ExportContext } from "./prompt.ts";
 import { TAGS, type Capture } from "../db/types.ts";
 
@@ -173,8 +174,7 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     pages.push(p.c);
   }
 
-  // --- jsPDF 조립 (동적 import) ---
-  const { jsPDF } = await import("jspdf");
+  // --- jsPDF 조립 (정적 import — PWA 서비스워커 동적청크 fetch 실패 회피) ---
   const doc = new jsPDF({ unit: "px", format: [W, H], orientation: "portrait" });
   pages.forEach((c, i) => {
     if (i > 0) doc.addPage([W, H], "portrait");
