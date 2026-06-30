@@ -1,6 +1,6 @@
 /**
  * Capture 루프 — PRD §7-B / §16. 사진 경로.
- * 흐름: 셔터(동결) → 태그(필수, 단일) → Why(선택, 칩) → 저장 → 즉시 카메라 복귀.
+ * 흐름: 셔터(동결) → 태그(필수, 단일) → 내 생각(선택, note) → 저장 → 즉시 카메라 복귀.
  * 예산 계측: 웜업 / 앱 지연(appMs) / 사람 시간(humanMs) / 압축 / 용량을 HUD로 노출.
  */
 import type { Nav } from "../app.ts";
@@ -8,9 +8,9 @@ import { startCamera, stopCamera } from "../camera/camera.ts";
 import { grabFrame, resizeCompress } from "../lib/image.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
 import { addCapture, countCaptures, getBook, getSession, uuid } from "../db/db.ts";
-import { TAGS, WHY_CHIPS, type Capture, type Session, type Tag } from "../db/types.ts";
+import { TAGS, type Capture, type Session, type Tag } from "../db/types.ts";
 
-type Phase = "live" | "tagging" | "why";
+type Phase = "live" | "tagging" | "note";
 
 export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): () => void {
   root.innerHTML = `<div class="cam"><div class="cam__boot">카메라 준비 중…</div></div>`;
@@ -39,8 +39,6 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
     const scrim = root.querySelector(".sheet-scrim") as HTMLElement;
     const sheet = root.querySelector(".sheet") as HTMLElement;
     const sheetTag = root.querySelector(".sheet__tag") as HTMLElement;
-    const chipEls = Array.from(root.querySelectorAll(".chip[data-why]")) as HTMLElement[];
-    const writeChip = root.querySelector(".chip--write") as HTMLElement;
     const free = root.querySelector(".sheet__free") as HTMLTextAreaElement;
     const pageInput = root.querySelector(".sheet__page") as HTMLInputElement;
     const saveBtn = root.querySelector(".btn-save") as HTMLButtonElement;
@@ -54,7 +52,6 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
     let frame: ImageBitmap | null = null;
     let freezeUrl: string | null = null;
     let chosenTag: Tag | null = null;
-    let chosenWhy: string | null = null;
     let count = startCount;
     let shutterMs = 0;
     const captureSw = new Stopwatch();
@@ -124,7 +121,7 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
     });
 
     function openSheet() {
-      phase = "why";
+      phase = "note";
       scrim.classList.add("is-open");
       sheet.classList.add("is-open");
     }
@@ -133,28 +130,13 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
       sheet.classList.remove("is-open");
     }
 
-    chipEls.forEach((el) => {
-      el.onclick = () => {
-        const v = el.dataset.why!;
-        const already = el.classList.contains("is-sel");
-        chipEls.forEach((c) => c.classList.remove("is-sel"));
-        free.style.display = "none";
-        chosenWhy = already ? null : ((el.classList.add("is-sel"), v) as string);
-      };
-    });
-    writeChip.onclick = () => {
-      chipEls.forEach((c) => c.classList.remove("is-sel"));
-      free.style.display = "block";
-      free.focus();
-    };
     scrim.onclick = closeSheet;
 
     // --- 저장 ---
     saveBtn.onclick = async () => {
       if (!chosenTag) return;
       const saveSw = new Stopwatch();
-      const freeVal = free.style.display === "block" ? free.value.trim() : "";
-      const why = freeVal || chosenWhy || null;
+      const memoVal = free.value.trim() || null;
 
       const rec: Capture = {
         uuid: uuid(),
@@ -162,9 +144,10 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
         createdAt: Date.now(),
         updatedAt: Date.now(),
         image: null,
-        memo: null,
+        passage: null,
+        memo: memoVal,
         tag: chosenTag,
-        why,
+        why: null,
         ocr: null,
         exportStatus: "none",
       };
@@ -228,13 +211,10 @@ export function mountCapture(root: HTMLElement, nav: Nav, sessionId: string): ()
     function resetToLive() {
       phase = "live";
       chosenTag = null;
-      chosenWhy = null;
       cam.classList.remove("is-frozen");
       tagEls.forEach((t) => t.classList.remove("is-sel"));
-      chipEls.forEach((c) => c.classList.remove("is-sel"));
       free.value = "";
       pageInput.value = "";
-      free.style.display = "none";
       hint.textContent = "책 페이지를 담고 셔터를 누르세요";
       if (freezeUrl) {
         URL.revokeObjectURL(freezeUrl);
@@ -251,7 +231,6 @@ function template(session: Session, bookTitle: string, startCount: number) {
     (t) =>
       `<button class="tag" data-tag="${t.key}" aria-label="${t.label}">${t.emoji}<span class="tag__l">${t.label}</span></button>`,
   ).join("");
-  const chips = WHY_CHIPS.map((w) => `<button class="chip" data-why="${w}">${w}</button>`).join("");
   const project = session.project ? `<span class="sep">·</span> 🎯 ${esc(session.project)}` : "";
   return `
   <div class="cam">
@@ -277,14 +256,9 @@ function template(session: Session, bookTitle: string, startCount: number) {
     <div class="sheet">
       <div class="grab"></div>
       <div class="sheet__tag">⭐ 중요하다</div>
-      <h2>왜 저장했나요?</h2>
-      <div class="sheet__cap">한 번만 탭하면 끝 — 건너뛰어도 돼요.</div>
-      <div class="chips">
-        ${chips}
-        <button class="chip chip--write">직접 입력…</button>
-      </div>
+      <h2>내 생각 (선택)</h2>
+      <textarea class="sheet__free" rows="2" placeholder="내 생각·메모 (선택)"></textarea>
       <input class="sheet__page" type="number" inputmode="numeric" min="1" placeholder="페이지(선택)" />
-      <textarea class="sheet__free" rows="2" placeholder="왜 저장했는지 한 줄" style="display:none"></textarea>
       <button class="btn-primary btn-save">저장</button>
     </div>
 
