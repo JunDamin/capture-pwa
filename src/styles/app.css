@@ -256,7 +256,7 @@
 }
 .btn-primary {
   width: 100%;
-  height: 56px;
+  min-height: 56px;
   border-radius: var(--r-btn);
   background: var(--primary);
   color: #fff;
@@ -269,6 +269,7 @@
   transform: scale(0.98);
   background: var(--primary-press);
 }
+.topdf { margin-top: 4px; }
 
 /* ---- 저장 완료 토스트 (시그니처: 저장의 쾌감) ---- */
 .done {
