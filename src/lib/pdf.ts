@@ -62,22 +62,21 @@ function fmtTime(ts: number): string {
 }
 
 /**
- * Blob을 이미지로 로드. iOS Safari(15~16)의 createImageBitmap 미지원/버그를 피하려
- * Image + decode()를 쓴다(iOS 11+, 전 브라우저 호환). decode 미지원 시 onload 폴백.
+ * Blob을 이미지로 로드.
+ * - createImageBitmap: iOS Safari 15~16에서 미지원/버그 → 사용 안 함.
+ * - img.decode(): iOS Safari는 blob URL 이미지에 대해 `EncodingError: Loading error.`로
+ *   거부하는 WebKit 버그가 있다(실제로는 onload로 정상 로드됨) → 사용 안 함.
+ * 그래서 가장 호환성 높은 onload/onerror만 쓴다(앱의 다른 화면도 같은 blob을 object URL로 잘 표시함).
  */
 async function loadImage(blob: Blob): Promise<HTMLImageElement> {
   const url = URL.createObjectURL(blob);
   const img = new Image();
   try {
-    img.src = url;
-    if (typeof img.decode === "function") {
-      await img.decode();
-    } else {
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("image load failed"));
-      });
-    }
+    await new Promise<void>((resolve, reject) => {
+      img.onload = () => resolve();
+      img.onerror = () => reject(new Error("image load failed"));
+      img.src = url;
+    });
     return img;
   } finally {
     URL.revokeObjectURL(url);
