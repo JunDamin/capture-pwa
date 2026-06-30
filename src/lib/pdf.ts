@@ -173,12 +173,15 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     p.g.fillText(meta, M, cy);
     cy += 40;
     p.g.fillStyle = INK;
-    for (const ln of wrap(p.g, `왜: ${cap.why ?? "(없음)"}`, W - M * 2)) {
-      p.g.fillText(ln, M, cy);
-      cy += 36;
+    const note = [cap.memo, cap.why].filter((s) => s && s.trim()).join(" · ");
+    if (cap.passage && cap.passage.trim()) {
+      for (const ln of wrap(p.g, `담은 글: ${cap.passage.trim()}`, W - M * 2)) {
+        p.g.fillText(ln, M, cy);
+        cy += 36;
+      }
     }
-    if (cap.memo) {
-      for (const ln of wrap(p.g, `메모: ${cap.memo}`, W - M * 2)) {
+    if (note) {
+      for (const ln of wrap(p.g, `내 생각: ${note}`, W - M * 2)) {
         p.g.fillText(ln, M, cy);
         cy += 36;
       }

@@ -8,7 +8,7 @@ import {
   getSession,
   putSession,
 } from "../db/db.ts";
-import { TAGS, WHY_CHIPS, type Capture, type Session } from "../db/types.ts";
+import { TAGS, type Capture, type Session } from "../db/types.ts";
 
 export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
   const urls: string[] = [];
@@ -45,13 +45,6 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       return n ? `<div class="srow"><span>${t.emoji} ${t.label}</span><b>${n}</b></div>` : "";
     }).join("");
 
-    const whyRows = WHY_CHIPS.map((w) => {
-      const n = caps.filter((c) => c.why === w).length;
-      return n ? `<div class="srow"><span>${esc(w)}</span><b>${n}</b></div>` : "";
-    }).join("");
-    const freeWhy = caps.filter((c) => c.why && !WHY_CHIPS.includes(c.why as any)).length;
-    const noWhy = caps.filter((c) => !c.why).length;
-
     root.innerHTML = `
     <div class="scr scr--light review">
       <div class="topbar">
@@ -78,13 +71,6 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       <div class="card">
         <div class="card__h">태그</div>
         ${tagRows || `<div class="srow muted">태그 없음</div>`}
-      </div>
-
-      <div class="card">
-        <div class="card__h">왜 저장했나</div>
-        ${whyRows}
-        ${freeWhy ? `<div class="srow"><span>직접 입력</span><b>${freeWhy}</b></div>` : ""}
-        <div class="srow ${noWhy ? "warn" : "muted"}"><span>"왜" 없는 캡처</span><b>${noWhy}</b></div>
       </div>
 
       <div class="card card--list">
@@ -144,7 +130,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     <div class="capcard" data-id="${c.uuid}">
       <div class="capthumb ${c.image ? "" : "capthumb--none"}">${c.image ? "" : "📝"}</div>
       <div class="capbody">
-        <div class="capmeta"><span class="captag">${tag.emoji} ${tag.label}</span> ${esc(c.why ?? (c.memo ? c.memo : "—"))}</div>
+        <div class="capmeta"><span class="captag">${tag.emoji} ${tag.label}</span> ${esc(c.passage ?? c.memo ?? c.why ?? "—")}</div>
         <div class="captime">${hm}</div>
       </div>
       <button class="capdel" aria-label="삭제">🗑</button>

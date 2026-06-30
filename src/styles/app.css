@@ -62,8 +62,14 @@
 .pill .sep {
   color: rgba(255, 255, 255, 0.4);
 }
+.pill__title {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .pill .cnt {
-  margin-left: auto;
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -71,6 +77,7 @@
   padding: 4px 10px;
   border-radius: 999px;
   font-weight: 700;
+  flex-shrink: 0;
 }
 
 /* ---- 하단 조작부 ---- */
@@ -120,7 +127,7 @@
   color: rgba(255, 255, 255, 0.82);
   line-height: 1;
 }
-.cam:not(.is-frozen) .tagrow {
+.cam:not(.is-frozen) .photo-ctrl .tagrow {
   opacity: 0.4;
   pointer-events: none;
 }
@@ -1016,4 +1023,207 @@
   width: min(100% - 40px, 480px);
   min-height: 48px;
   z-index: 1001;
+}
+
+/* ============================================================
+   모드 토글 — 캡처 pill + Books renderProject (ADR-013)
+   ============================================================ */
+
+/* 기본 토글 (다크 pill 위) */
+.mode-toggle {
+  display: flex;
+  gap: 3px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 11px;
+  padding: 3px;
+  flex-shrink: 0;
+}
+
+.mode-btn {
+  min-height: 48px;
+  min-width: 48px;
+  padding: 0 11px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+  white-space: nowrap;
+}
+
+.mode-btn.is-active {
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+}
+
+/* 라이트 배경 위 토글 (Books renderProject) */
+.mode-toggle--light {
+  background: var(--surface);
+  margin-bottom: 16px;
+}
+
+.mode-toggle--light .mode-btn {
+  color: var(--sub);
+}
+
+.mode-toggle--light .mode-btn.is-active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================================
+   입력 모드 — .cam.mode--input 상태 오버라이드
+   ============================================================ */
+
+/* 카메라 + 스크림 숨김 */
+.cam.mode--input .cam__video,
+.cam.mode--input .cam__freeze,
+.cam.mode--input .cam__scrim {
+  display: none;
+}
+
+/* HUD 숨김 */
+.cam.mode--input .hud {
+  display: none;
+}
+
+/* 사진 컨트롤 숨김 */
+.cam.mode--input .photo-ctrl {
+  display: none;
+}
+
+/* 전체 배경·텍스트 색을 라이트로 */
+.cam.mode--input {
+  background: var(--bg);
+  color: var(--ink);
+}
+
+/* pill 라이트 어댑터 */
+.cam.mode--input .pill {
+  background: rgba(0, 0, 0, 0.05);
+  backdrop-filter: none;
+  color: var(--ink);
+}
+
+.cam.mode--input .cam__back {
+  color: var(--ink);
+}
+
+.cam.mode--input .pill .sep {
+  color: rgba(0, 0, 0, 0.25);
+}
+
+.cam.mode--input .pill .cnt {
+  background: rgba(0, 0, 0, 0.07);
+  color: var(--ink);
+}
+
+.cam.mode--input .mode-toggle {
+  background: rgba(0, 0, 0, 0.07);
+}
+
+.cam.mode--input .mode-btn {
+  color: rgba(0, 0, 0, 0.45);
+}
+
+.cam.mode--input .mode-btn.is-active {
+  background: #fff;
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================================
+   입력 패널 — 라이트, 스크롤 가능
+   ============================================================ */
+
+.input-panel {
+  display: none;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.cam.mode--input .input-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.input-panel__inner {
+  padding: 16px 20px calc(var(--safe-bottom) + 32px);
+  display: flex;
+  flex-direction: column;
+}
+
+.inp__label {
+  display: block;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.inp__passage {
+  min-height: 140px;
+  resize: none;
+  margin-bottom: 14px;
+  line-height: 1.6;
+}
+
+.inp__note {
+  min-height: 80px;
+  resize: none;
+  margin-bottom: 14px;
+}
+
+.inp__page {
+  margin-bottom: 20px;
+}
+
+.inp__hint {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sub);
+  margin-bottom: 10px;
+}
+
+.inp__hint--err {
+  color: #ff6b6b;
+}
+
+/* 입력 모드 tagrow — 항상 인터랙티브 */
+.cam.mode--input .inp__tagrow {
+  opacity: 1;
+  pointer-events: auto;
+  margin-bottom: 22px;
+}
+
+/* 입력 모드 tag 색상 (라이트 배경) */
+.inp__tagrow .tag {
+  background: var(--surface);
+}
+
+.inp__tagrow .tag__l {
+  color: var(--sub);
+}
+
+.inp__tagrow .tag.is-sel {
+  background: var(--primary);
+  color: #fff;
+  transform: none;
+  box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3);
+}
+
+.inp__tagrow .tag.is-sel .tag__l {
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.inp__save {
+  margin-top: 4px;
+  min-height: 52px;
+}
+
+/* Books: 시작 모드 선택 레이블 */
+.proj__modesel {
+  width: 100%;
 }
