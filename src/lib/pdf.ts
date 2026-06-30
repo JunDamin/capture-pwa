@@ -149,16 +149,29 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     p.g.font = "700 34px Pretendard";
     p.g.fillText(num, M, M);
 
-    const img = await loadImage(cap.image);
-    const iw = img.naturalWidth || img.width;
-    const ih = img.naturalHeight || img.height;
     const availW = W - M * 2;
     const availH = H - (M + 70) - 320;
-    const scale = Math.min(availW / iw, availH / ih);
-    const dw = iw * scale;
-    const dh = ih * scale;
-    p.g.drawImage(img, (W - dw) / 2, M + 70, dw, dh);
-    img.src = ""; // 디코드된 소스 이미지 즉시 해제(iOS 메모리)
+    // 한 장이 실패해도(iOS 메모리 압박으로 Image onerror 등) PDF 전체가 깨지지 않게
+    // 장별로 격리: 실패 시 그 캡처는 "사진 없이 텍스트만" 페이지로.
+    let img: HTMLImageElement | null = null;
+    try {
+      img = await loadImage(cap.image);
+    } catch {
+      img = null;
+    }
+    if (img) {
+      const iw = img.naturalWidth || img.width;
+      const ih = img.naturalHeight || img.height;
+      const scale = Math.min(availW / iw, availH / ih);
+      const dw = iw * scale;
+      const dh = ih * scale;
+      p.g.drawImage(img, (W - dw) / 2, M + 70, dw, dh);
+      img.src = ""; // 디코드된 소스 이미지 즉시 해제(iOS 메모리)
+    } else {
+      p.g.fillStyle = SUB;
+      p.g.font = "400 28px Pretendard";
+      p.g.fillText("(사진을 불러오지 못했어요 — 텍스트만 포함)", M, M + 100);
+    }
 
     let cy = M + 70 + availH + 24;
     p.g.fillStyle = INK;
@@ -187,6 +200,8 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
       }
     }
     addPage(p.c);
+    // iOS가 직전 이미지 디코드 메모리를 회수할 틈을 준다(연속 대용량 디코드 실패 완화).
+    await new Promise((r) => setTimeout(r, 0));
   }
 
   return doc.output("blob");
