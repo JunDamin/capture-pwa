@@ -10,14 +10,6 @@ export const TAGS: { key: Tag; emoji: string; label: string }[] = [
   { key: "idea", emoji: "🌱", label: "아이디어" },
 ];
 
-/** Why 칩 — ADR-001/004. 자유입력은 별도(free text). */
-export const WHY_CHIPS = [
-  "프로젝트에 써먹기",
-  "다시 읽고 싶음",
-  "반대되는 생각",
-  "글감",
-] as const;
-
 export interface Book {
   uuid: string;
   title: string; // 필수 — ADR-006
