@@ -63,58 +63,17 @@ function fmtTime(ts: number): string {
 }
 
 /**
- * Blob을 이미지로 로드.
- * - createImageBitmap: iOS Safari 15~16에서 미지원/버그 → 사용 안 함.
- * - img.decode(): iOS Safari는 blob URL 이미지에 대해 `EncodingError: Loading error.`로
- *   거부하는 WebKit 버그가 있다(실제로는 onload로 정상 로드됨) → 사용 안 함.
- * 그래서 가장 호환성 높은 onload/onerror만 쓴다(앱의 다른 화면도 같은 blob을 object URL로 잘 표시함).
+ * Blob을 base64 dataURL로 (디코드 없이). PDF엔 이 JPEG를 jsPDF로 직접 삽입한다 —
+ * iOS는 RAM이 적어 3200px 이미지의 비트맵 디코드(createImageBitmap/Image 모두)가 실패하므로,
+ * 디코드를 아예 하지 않고 압축 JPEG 바이트를 그대로 PDF에 넣는다(메모리/엔진 무관).
  */
-async function loadImage(blob: Blob): Promise<HTMLImageElement> {
-  const url = URL.createObjectURL(blob);
-  const img = new Image();
-  try {
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error("image load failed"));
-      img.src = url;
-    });
-    return img;
-  } finally {
-    URL.revokeObjectURL(url);
-  }
-}
-
-interface DecodedImage {
-  src: CanvasImageSource;
-  w: number;
-  h: number;
-  close: () => void;
-}
-
-/**
- * PDF용 이미지 디코드. iOS는 RAM이 적어 3200px 풀 디코드(~30MB)가 실패한다(onerror).
- * createImageBitmap의 resizeWidth로 **축소 디코드**(긴 변 ~maxEdge)해 메모리를 1/6 이하로.
- * createImageBitmap이 안 되는 환경은 Image+onload(풀 디코드)로 폴백.
- */
-async function decodeForPdf(blob: Blob, maxEdge: number): Promise<DecodedImage> {
-  if (typeof createImageBitmap === "function") {
-    try {
-      // resizeWidth만 지정 → 종횡비 유지하며 width를 maxEdge로 축소(스펙). 둘 다 주면 왜곡됨.
-      const bmp = await createImageBitmap(blob, { resizeWidth: maxEdge, resizeQuality: "high" });
-      return { src: bmp, w: bmp.width, h: bmp.height, close: () => bmp.close?.() };
-    } catch {
-      /* 폴백: Image+onload 풀 디코드 */
-    }
-  }
-  const img = await loadImage(blob);
-  return {
-    src: img,
-    w: img.naturalWidth || img.width,
-    h: img.naturalHeight || img.height,
-    close: () => {
-      img.src = "";
-    },
-  };
+function blobToDataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error || new Error("read failed"));
+    r.readAsDataURL(blob);
+  });
 }
 
 export async function buildPdf(ctx: ExportContext): Promise<Blob> {
@@ -184,21 +143,23 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
 
     const availW = W - M * 2;
     const availH = H - (M + 70) - 320;
-    // iOS RAM 절약을 위해 축소 디코드(decodeForPdf). 한 장이 실패해도 PDF 전체가
-    // 깨지지 않게 장별 격리 — 실패 시 그 캡처는 "사진 없이 텍스트만" 페이지로.
-    let dec: DecodedImage | null = null;
+    // 사진은 디코드 없이 JPEG를 PDF에 직접 삽입한다(addPage 뒤 doc.addImage). 여기선 dataURL+치수만 준비.
+    // 한 장이 실패해도 PDF 전체가 깨지지 않게 장별 격리 — 실패 시 "텍스트만" 페이지.
+    let photo: { dataUrl: string; w: number; h: number } | null = null;
     try {
-      dec = await decodeForPdf(cap.image, 1400);
+      const dataUrl = await blobToDataUrl(cap.image);
+      let w = cap.imageW || 0;
+      let h = cap.imageH || 0;
+      if (!w || !h) {
+        const props = doc.getImageProperties(dataUrl);
+        w = props.width;
+        h = props.height;
+      }
+      photo = { dataUrl, w, h };
     } catch {
-      dec = null;
+      photo = null;
     }
-    if (dec) {
-      const scale = Math.min(availW / dec.w, availH / dec.h);
-      const dw = dec.w * scale;
-      const dh = dec.h * scale;
-      p.g.drawImage(dec.src, (W - dw) / 2, M + 70, dw, dh);
-      dec.close(); // 디코드 소스 즉시 해제(iOS 메모리)
-    } else {
+    if (!photo) {
       p.g.fillStyle = SUB;
       p.g.font = "400 28px Pretendard";
       p.g.fillText("(사진을 불러오지 못했어요 — 텍스트만 포함)", M, M + 100);
@@ -231,7 +192,13 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
       }
     }
     addPage(p.c);
-    // iOS가 직전 이미지 디코드 메모리를 회수할 틈을 준다(연속 대용량 디코드 실패 완화).
+    if (photo) {
+      const scale = Math.min(availW / photo.w, availH / photo.h);
+      const dw = photo.w * scale;
+      const dh = photo.h * scale;
+      // 디코드 없이 압축 JPEG를 페이지에 직접 삽입(iOS 메모리 무관).
+      doc.addImage(photo.dataUrl, "JPEG", (W - dw) / 2, M + 70, dw, dh);
+    }
     await new Promise((r) => setTimeout(r, 0));
   }
 
