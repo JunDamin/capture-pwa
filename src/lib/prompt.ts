@@ -46,11 +46,12 @@ export function buildExport(ctx: ExportContext): ExportPackage {
       files.push({ name, blob: c.image });
       imgLine = `${name} (첨부)`;
     }
+    const note = [c.memo, c.why].filter((s) => s && s.trim()).join(" · ") || null; // 레거시 why 합치기
     const lines = [
-      `### capture-${pad(i)} · ${tag.emoji} ${tag.label} · ${fmtTime(c.createdAt)}`,
-      `- 왜: ${c.why ?? "(없음)"}`,
+      `### capture-${pad(i)} · ${tag.emoji} ${tag.label} · ${fmtTime(c.createdAt)}${c.page ? ` · p.${c.page}` : ""}`,
     ];
-    if (c.memo) lines.push(`- 메모: ${c.memo}`);
+    if (c.passage && c.passage.trim()) lines.push(`- 담은 글: ${c.passage.trim()}`);
+    if (note) lines.push(`- 내 생각: ${note}`);
     lines.push(`- 사진: ${imgLine}`);
     return lines.join("\n");
   });
@@ -62,14 +63,6 @@ export function buildExport(ctx: ExportContext): ExportPackage {
   })
     .filter(Boolean)
     .join(" · ");
-  const idxList = (pred: (c: Capture) => boolean) =>
-    captures
-      .map((c, i) => (pred(c) ? `capture-${pad(i)}` : null))
-      .filter(Boolean)
-      .join(", ") || "(없음)";
-  const writingCandidates = idxList((c) => c.why === "글감");
-  const noWhy = idxList((c) => !c.why);
-
   const author = ctx.author ? ` (${ctx.author})` : "";
   const project = ctx.project ? `\n- 목적(프로젝트): ${ctx.project}` : "";
 
@@ -81,18 +74,10 @@ export function buildExport(ctx: ExportContext): ExportPackage {
 
 ## 너에게 (지시)
 
-나는 책을 읽으며 떠오른 생각을 빠르게 캡처했다. 아래는 그 원본이다.
-각 캡처에는 내가 붙인 **태그**(아래 범례)와 **"왜 저장했나"**가 있다.
-함께 첨부한 사진들은 책 페이지다. **각 사진을 OCR**해서, 파일명의 번호(\`capture-NN\`)로 아래 캡처와 연결하라.
+나는 책을 읽으며 떠오른 생각을 빠르게 캡처했다. 각 캡처에는 **태그**, 책에서 **담은 글(passage)**, **내 생각(note)**, 그리고 첨부 사진이 있을 수 있다.
+첨부 사진은 책 페이지다. **각 사진을 OCR**해 파일명 번호(\`capture-NN\`)로 아래 항목과 연결하라. 그런 다음 아래를 만들어라:
 
-그런 다음 아래를 만들어라:
-
-1. **주요 주제** — 반복해서 나타나는 생각의 묶음
-2. **반복된 생각 / 강조점**
-3. **캡처 간 관계** — 서로 연결되거나 충돌하는 것
-4. **글감 후보** — 블로그/글로 발전시킬 만한 것
-5. **인터뷰 질문** — 이 주제로 누군가와 대화한다면
-6. **독서노트 초안** — 위를 종합한 정리
+1. **주요 주제** 2. **반복/강조** 3. **캡처 간 관계(연결·충돌)** 4. **글감 후보** 5. **인터뷰 질문** 6. **독서노트 초안**
 
 ## 태그 범례
 
@@ -102,11 +87,9 @@ ${TAGS.map((t) => `- ${t.emoji} ${t.label}`).join("\n")}
 
 ${blocks.join("\n\n")}
 
-## 규칙 기반 사전 분류 (참고 — 출발점으로만)
+## 참고 — 태그 분포
 
-- 태그 분포: ${tagDist || "(없음)"}
-- "글감" 후보: ${writingCandidates}
-- "왜" 없는 캡처: ${noWhy}
+${tagDist || "(없음)"}
 `;
 
   // prompt.md를 파일 목록 맨 앞에
