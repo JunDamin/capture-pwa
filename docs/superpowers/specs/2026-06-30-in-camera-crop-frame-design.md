@@ -35,8 +35,10 @@ export interface CropFrame {
 export function mountCropFrame(camEl: HTMLElement): CropFrame;
 export function loadCropRect(): CropRect;   // localStorage 또는 기본값
 ```
-- 상태: rect 0..1(뷰파인더 clientW/H 기준). pointerdown이 핸들이면 resize(반대변 고정, 최소 크기 클램프, 0..1 클램프), 박스 내부면 move, 매 변경 `renderFrame()`. pointerup에 `saveCropRect(rect)`.
+- 상태: rect 0..1(뷰파인더 clientW/H 기준). pointerdown이 핸들이면 resize(반대변 고정, 최소 크기 **w·h 각각** 클램프 예: 0.08, 0..1 클램프), 박스 내부면 move, 매 변경 `renderFrame()`. pointerup에 `saveCropRect(rect)`.
 - 마스크: 박스 바깥 4개 dim div(옅게) 또는 box-shadow.
+- **회전 대응(검토 C):** `window.addEventListener("resize", renderFrame)`(또는 camEl ResizeObserver)로 방향 전환 시 DOM 오버레이 px 재계산. `destroy()`에서 해제. 정규화 rect 자체는 불변(뷰파인더 기준).
+- `elW/elH`는 **상호작용 시점에 lazy로** `camEl.clientWidth/Height` 읽기(마운트 시점 0 회피).
 
 ### 2. `src/lib/image.ts` — 크롭 인지 압축 추가
 ```ts
@@ -51,19 +53,28 @@ export async function cropResizeCompress(
 
 ### 3. `src/screens/capture.ts` — 라이브에 프레임 + 셔터 시 크롭
 - 카메라 시작 후 `mountCropFrame(cam)`; cleanup에서 `destroy()`.
-- **셔터:** 기존 `grabFrame(video)`(풀 영상) 유지. 저장 시 `resizeCompress(frame)` 대신:
+- **크롭 소스 = freeze 캔버스(검토 A, 중요):** 셔터 핸들러는 이미 풀 영상을 캔버스에 그린다(capture.ts:163-166 `canvas.drawImage(video,0,0)`, iOS-safe). 이 캔버스를 `let freezeCanvas: HTMLCanvasElement | null = canvas`로 보관해 **크롭 소스로 재사용**한다 — `grabFrame`의 `createImageBitmap`(iOS 취약, ADR-013) 의존을 피하고 재작업도 없앤다. (`grabFrame` 자체 정리는 별건 — 이 기능에서 막지 않음.)
+- **셔터/저장:** 저장 시 `resizeCompress(frame)` 대신 `freezeCanvas`를 크롭 소스로:
   - 프레임 rect(뷰파인더 0..1)를 **object-fit: cover 변환**으로 영상 픽셀 rect로:
     `scale = max(elW/vW, elH/vH)`; `dispW=vW*scale, dispH=vH*scale`; `offX=(dispW-elW)/2, offY=(dispH-elH)/2`;
     영상픽셀 `sx=(rect.x*elW+offX)/scale`, `sy=(rect.y*elH+offY)/scale`, `sw=rect.w*elW/scale`, `sh=rect.h*elH/scale` (0..vW/vH 클램프).
-  - `cropResizeCompress(frame, vW, vH, {sx,sy,sw,sh})` → blob/width/height → rec.image/imageW/imageH(ArrayBuffer 저장은 db 경계가 처리, ADR-015).
-  - `elW/elH` = `video.clientWidth/clientHeight`(또는 `.cam` 박스). videoW/H = `video.videoWidth/Height`.
+  - `cropResizeCompress(freezeCanvas, vW, vH, {sx,sy,sw,sh})` → blob/width/height → rec.image/imageW/imageH(ArrayBuffer 저장은 db 경계가 처리, ADR-015).
+  - `elW/elH` = `video.clientWidth/clientHeight`(또는 `.cam` 박스). videoW/H = `video.videoWidth/Height`. (셔터 시점엔 영상 준비됨 — 타이밍 안전.)
 - 입력 모드엔 프레임 없음(사진 모드만).
 
 ### 4. `src/styles/app.css` — 오버레이(간결)
 - `.cropframe`(얇은 흰 테두리), `.cropframe__handle`(작게, hit-area ≥44px), `.cropframe__mask`(옅은 dim). 다크 위에서 최소한으로.
+- **z-index = 2**(영상/freeze 위, 컨트롤(.bottom z3)·시트 아래). 핸들 `pointer-events:auto`.
+- **표시 규칙(검토 B):** 라이브에서만 보이게 —
+  ```css
+  .cam.is-frozen .cropframe { display: none; }   /* 동결(태그·노트) 중 숨김 */
+  /* 입력 모드 클래스(현 코드 확인 후): */ .cam.mode--input .cropframe { display: none; }
+  ```
+  (입력 모드 실제 클래스명은 구현자가 capture.ts/CSS에서 확인해 맞춤.)
+- **z2 한계(검토 D):** 기본 프레임 하단은 컨트롤(.bottom z3) 위로 가지 않게 잡음 — 하단 핸들이 컨트롤 영역과 겹치면 닿지 않을 수 있음(셔터 항상 닿게 하기 위한 의도적 트레이드오프). 사용자는 상단·좌우·박스 이동으로 조절.
 
 ## 데이터/지속
-- `localStorage["capture.cropFrame"]` = `{x,y,w,h}`(0..1). 없으면 기본 = 가로 넓은 밴드 `{x:0.06,y:0.29,w:0.88,h:0.42}`(중앙, 튜닝 가능). 파싱 실패 시 기본.
+- `localStorage["capture.cropFrame"]` = `{x,y,w,h}`(0..1). 없으면 기본 = 가로 넓은 밴드 **`{x:0.06,y:0.25,w:0.88,h:0.38}`**(하단 0.63 — 컨트롤 영역 회피, 검토 D). 파싱 실패 시 기본. (코드베이스 첫 localStorage 사용 — iOS standalone PWA 지속 OK.)
 
 ## 에러/엣지
 - `grabFrame` 실패(frame null): 기존과 동일 — 이미지 없이 메타만 저장(텍스트 캡처). 크롭 시도 안 함.
