@@ -42,8 +42,8 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     root.innerHTML = `
     <div class="scr scr--light export">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
-        <div class="topbar__t">Export</div>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
+        <div class="topbar__t">AI에게 넘기기</div>
       </div>
 
       <div class="card">
@@ -51,7 +51,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         <div class="exp__stats">
           <span>📝 prompt.md</span><span>·</span>
           <span>📷 사진 ${pkg.imageCount}</span><span>·</span>
-          <span>🗂 캡처 ${caps.length}</span>
+          <span>🗂 캡처 ${caps.length}개</span>
         </div>
         <div class="exp__how">
           첨부된 <b>prompt.md</b>와 사진을 ChatGPT·Claude에 함께 넘기면,
@@ -59,7 +59,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         </div>
       </div>
 
-      <button class="btn-primary topdf">📄 PDF로 내보내기 (AI에게 넘기기)</button>
+      <button class="btn-primary topdf">📄 PDF로 AI에게 넘기기</button>
       <div class="exp__alt">
         <button class="btn-ghost copy">📋 프롬프트 복사</button>
       </div>
@@ -98,18 +98,18 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
           const r = await shareFiles([file], `독서 캡처 — ${title}`, pkg.promptMd);
           if (r === "shared") {
             await markExported(caps);
-            flash(copied ? "공유했어요 · 프롬프트 복사됨 — 붙여넣고 보내세요" : "공유했어요");
+            flash(copied ? "공유했어요 · 프롬프트도 복사했어요 — 붙여넣고 보내세요" : "공유했어요");
           } else if (r === "unsupported") {
             downloadFile(file);
             await markExported(caps);
-            flash(copied ? "PDF 내려받음 · 프롬프트 복사됨 — 붙여넣으세요" : "PDF를 내려받아요");
+            flash(copied ? "PDF를 내려받았어요 · 프롬프트도 복사했어요 — 붙여넣으세요" : "PDF를 내려받았어요");
           } else if (r !== "cancelled") {
             flash("공유 중 문제가 생겼어요");
           }
         } else {
           downloadFile(file);
           await markExported(caps);
-          flash(copied ? "PDF 내려받음 · 프롬프트 복사됨 — 붙여넣으세요" : "PDF를 내려받아요");
+          flash(copied ? "PDF를 내려받았어요 · 프롬프트도 복사했어요 — 붙여넣으세요" : "PDF를 내려받았어요");
         }
       } catch (e) {
         console.error("buildPdf failed", e);

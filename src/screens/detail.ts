@@ -42,7 +42,7 @@ export function mountDetail(
     root.innerHTML = `
     <div class="scr scr--light detail">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">캡처</div>
       </div>
 
@@ -134,6 +134,8 @@ export function mountDetail(
     const memo = root.querySelector(".detail__memo") as HTMLTextAreaElement;
     const pageEl = root.querySelector(".detail__page") as HTMLInputElement;
     const tagEls = Array.from(root.querySelectorAll(".tagpill")) as HTMLElement[];
+    passageEl.oninput = () => passageEl.classList.remove("field--err");
+    memo.oninput = () => memo.classList.remove("field--err");
 
     tagEls.forEach((el) => {
       el.onclick = () => {
@@ -142,17 +144,24 @@ export function mountDetail(
       };
     });
 
-    (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
+    const saveBtn = root.querySelector(".save") as HTMLButtonElement;
+    saveBtn.onclick = async () => {
       const passageVal = passageEl.value.trim() || null;
       const memoVal = memo.value.trim() || null;
       const n = parseInt(pageEl.value, 10);
       const page = Number.isFinite(n) && n > 0 ? n : undefined;
       if (!isValidCapture({ image: cap.image, passage: passageVal, memo: memoVal, tag })) {
-        alert("담고 싶은 글이나 사진이 필요해요.");
+        // capture 패턴과 통일 — 내용 필드 표시 + 토스트(alert 금지)
+        passageEl.focus();
+        passageEl.classList.add("field--err");
+        memo.classList.add("field--err");
+        flash("담은 글이나 내 생각, 사진 중 하나는 필요해요");
         return;
       }
+      saveBtn.disabled = true; // 지연 back 동안 재저장 방지
       await updateCapture({ ...cap, tag, passage: passageVal, memo: memoVal, why: null, page, updatedAt: Date.now() });
-      back();
+      flash("저장했어요");
+      setTimeout(back, 900); // 토스트가 보이도록 잠깐 머문 뒤 복귀
     };
   }
 

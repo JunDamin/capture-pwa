@@ -8,7 +8,7 @@ export function mountTransfer(root: HTMLElement, nav: Nav): () => void {
   root.innerHTML = `
   <div class="scr scr--light transfer">
     <div class="topbar">
-      <button class="iconbtn back">‹</button>
+      <button class="iconbtn back" aria-label="뒤로">‹</button>
       <div class="topbar__t">백업·설정</div>
     </div>
 
