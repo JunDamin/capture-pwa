@@ -53,6 +53,20 @@
 - 마이크로카피: "다시 찍기", "저장"(기존 액션명 유지).
 - objectURL 수명: pendingPhoto 표시 URL은 저장/다시 찍기/화면 이탈 시 revoke.
 
+## 검토 조정 (충돌 감사 11건 — 구속)
+
+1. **시트 열림 중 상단 노출 요소 차단:** `cam__back`(→홈)·`cnt`(→review)·모드 토글·pill이 시트 위 ~10% 틈으로 탭 가능 → `.cam.is-editing` 상태 클래스 도입, `.cam.is-editing .pill { pointer-events: none }` + 각 핸들러 `if (editing) return` 가드. **크롭 프레임 핸들도** `.cam.is-editing .cropframe { pointer-events: none }`. **HUD도 숨김** `.cam.is-editing .hud { display: none }`.
+2. **스냅샷 의미론(ADR-018 명시):** 크롭 rect + cover 매핑은 **셔터 시점에 확정** — 직전 배치(§9)의 "동결 중 프레임 조정이 저장에 반영" 동작은 본 재설계로 **폐기**(동결 상태 소멸). 보상: 조정 11(시트에서 재크롭).
+3. **예산 재정의:** `shutterMs` = 셔터 탭→시트 상승 시작(동기 작업만, ~≤50ms 목표); `compressMs`는 병행 실행·**appMs에서 제외 유지**(현행과 동일 — 사용자를 막는 시간이 아님); `saveMs` = 저장 탭→시트 하강+addCapture. `appMs = shutterMs + saveMs ≤ 300` 불변. **회귀 기준 추가: "사진이 시트 상승 애니메이션(0.32s) 끝나기 전에 표시"**(compressMs ≤ ~300ms 가드, HUD 형태 불변 — compressMs는 pendingPhoto에 실어 저장 시 기록).
+4. **다시 찍기 = 사진만 폐기(결정):** URL revoke + pendingPhoto null, **입력 텍스트·태그는 보존** → 다음 셔터에 필드 유지된 채 시트 재개. 전체 초기화는 저장/모드 전환/이탈 시.
+5. **`.cam__freeze` + freezeUrl toBlob 프리뷰 완전 삭제**(동결 표시 전용이었음). 압축은 시트 상승과 병행 — 사진 자리는 중립 placeholder(detail의 `--none` 패턴), 완료 시 img src 교체. **늦은 실패는 자연히 무사진 상태로 강등**(placeholder 유지 + 다시 찍기 탈출구, 검증은 저장 시 pendingPhoto 기준).
+6. **저장 피드백(결정):** 사진 저장 = 기존 **✓ done 배지 유지**(시그니처 "저장의 쾌감"), 무사진 폴백 저장 = "저장했어요" 토스트(입력모드와 동일).
+7. **에디터 = 복제 DOM + 공용 헬퍼(옵션 b):** `.ed__passage/.ed__note/.ed__page/.ed__tagrow`가 기존 `.field`/`.tag` 클래스 재사용, `wireTagRow(els, onPick)`/`readForm(els)`/`validate({hasPhoto,...})` 헬퍼를 입력 패널과 공유. 입력모드의 밝은 태그행 CSS를 공용 클래스로 재타깃. (같은 DOM 재부모화 금지 — 상태 오염·CSS 스코프 충돌.)
+8. **detail.ts 반응형:** `.detail__photo`(4:3 background-image div — 레터박스가 패딩 문제의 원인)를 시트와 동일한 `<img>` 처리로 전환(≤30vh·object-fit·패딩 최소), 가로모드 70vh 오버라이드 정합.
+9. **cleanup에서 pendingPhoto URL revoke + 기존 freezeUrl 언마운트 누수도 함께 수정**(동결 삭제로 자연 해소되지만 명시).
+10. **재크롭(채택):** 시트 사진 탭 → `openImageViewer(blob, { onCrop })`(detail 패턴 재사용) — pendingPhoto 교체 + 헤더 src 갱신. §9 폐기 보상.
+11. **사진 저장 핸들러 단순화:** 크롭이 셔터로 이동하면서 현행 이중 addCapture(메타 선저장→이미지 후저장)가 **단일 addCapture로 수렴**. 카메라 스트림은 시트 아래에서도 라이브 유지 — 현행 동결 상태도 스트림을 안 멈췄으므로 열/배터리 동등(ADR-018에 한 줄).
+
 ## 검증
 `npm run build` + `test:pdf` + preview(데스크톱: 셔터→편집 표시·다시 찍기·저장·검증 규칙·책 전환 pill) + **iOS 실기기**(전환 체감 속도, 크롭 결과 표시, 예산 HUD).
 
