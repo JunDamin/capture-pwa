@@ -20,8 +20,10 @@
   --primary: #3182f6;
   --primary-press: #2272e6;
   --view: #17171c;
+  --danger: #ff6b6b;
+  --line: #e5e8eb;
 
-  --r-card: 16px;
+  --r-card: 20px;
   --r-btn: 14px;
 
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);

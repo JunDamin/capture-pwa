@@ -69,7 +69,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     root.innerHTML = `
     <div class="scr scr--light review">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">${esc(title)}</div>
       </div>
 
@@ -77,14 +77,14 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         <div class="hero__head">
           ${heroCover}
           <div>
-            <div class="hero__n">${caps.length}<span>개의 Capture</span></div>
+            <div class="hero__n"><span>캡처</span>${caps.length}<span>개</span></div>
             <div class="hero__scope">${scopeLabel}</div>
           </div>
         </div>
         ${
           scope === "session"
             ? `<button class="scopebtn toBook">이 책 전체 보기 ›</button>
-        <button class="scopebtn toBookExport">📤 이 책 전체 AI 전달</button>`
+        <button class="scopebtn toBookExport">📤 이 책 전체 AI에게 넘기기</button>`
             : ""
         }
       </div>
@@ -105,11 +105,11 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       </div>
 
       <div class="card card--list">
-        <div class="card__h">캡처 ${caps.length}</div>
+        <div class="card__h">캡처 ${caps.length}개</div>
         <div class="caplist">${listHtml}</div>
       </div>
 
-      <button class="btn-primary export">📤 Export — AI에게 넘기기</button>
+      <button class="btn-primary export">📤 AI에게 넘기기</button>
       `
           : ""
       }

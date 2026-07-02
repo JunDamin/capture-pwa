@@ -22,7 +22,7 @@ export function openBookPicker(opts: {
     const views = await recentBooks(50);
     const list = el.querySelector(".bookpick__list") as HTMLElement;
     if (!list.isConnected) return; // 이미 dismiss됨
-    if (!views.length) { list.innerHTML = `<div class="hint-empty">책이 없어요</div>`; return; }
+    if (!views.length) { list.innerHTML = `<div class="hint-empty">아직 책이 없어요 — 책장에서 먼저 등록해 주세요</div>`; return; }
     list.innerHTML = views.map((v, i) => {
       let coverHtml = `<div class="mini cov-${(i % 3) + 1}"></div>`;
       if (v.book.cover instanceof ArrayBuffer) {
@@ -34,7 +34,7 @@ export function openBookPicker(opts: {
       return `<button class="bookpick__row" data-i="${i}">
         ${coverHtml}
         <span class="bookpick__body"><span class="bookpick__title">${esc(v.book.title)}</span>
-        <span class="bookpick__sub">${v.captureCount} captures</span></span>
+        <span class="bookpick__sub">캡처 ${v.captureCount}개</span></span>
         ${cur ? `<span class="bookpick__check">✓</span>` : ""}
       </button>`;
     }).join("");

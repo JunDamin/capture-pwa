@@ -67,9 +67,11 @@
 .pill .cnt {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
+  min-height: 44px; /* 탭타깃 — pill 안 mode-btn(48px)과 균형 */
   background: rgba(255, 255, 255, 0.15);
-  padding: 4px 10px;
+  padding: 10px 12px;
   border-radius: 999px;
   font-weight: 700;
   flex-shrink: 0;
@@ -222,33 +224,8 @@
   width: 38px;
   height: 5px;
   border-radius: 3px;
-  background: #e5e8eb;
+  background: var(--line);
   margin: 0 auto 18px;
-}
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-bottom: 14px;
-}
-.chip {
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 11px 16px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  transition: transform 0.15s var(--spring);
-}
-.chip:active {
-  transform: scale(0.95);
-}
-.chip.is-sel {
-  background: #e7f0fe;
-  color: var(--primary);
-}
-.chip.chip--write {
-  color: var(--sub);
 }
 .btn-primary {
   width: 100%;
@@ -404,7 +381,7 @@
 /* 공통 카드 / 입력 / 버튼 */
 .card {
   background: var(--surface);
-  border-radius: 20px;
+  border-radius: var(--r-card);
   padding: 20px;
   margin-bottom: 18px;
 }
@@ -432,7 +409,7 @@
   color: #b0b8c1;
 }
 .field--err {
-  outline: 2px solid #ff6b6b;
+  outline: 2px solid var(--danger);
 }
 .setting__s {
   color: var(--sub);
@@ -570,12 +547,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.bookmeta {
-  font-size: 14px;
-  color: var(--sub);
-  font-weight: 500;
-  margin-top: 4px;
-}
 .sessionchip {
   display: inline-flex;
   align-items: center;
@@ -592,9 +563,6 @@
   height: 7px;
   border-radius: 50%;
   background: var(--primary);
-}
-.dot--off {
-  background: #c4ccd4;
 }
 .chev {
   color: #c4ccd4;
@@ -619,7 +587,7 @@
   color: var(--ink);
   font-size: 14px;
   font-weight: 700;
-  border: 1.5px solid #e5e8eb;
+  border: 1.5px solid var(--line);
   transition: background 0.12s ease, transform 0.1s ease;
 }
 .cm-btn:active {
@@ -770,8 +738,10 @@
   font-size: 18px;
   font-weight: 700;
   color: var(--sub);
-  margin-left: 8px;
   letter-spacing: 0;
+}
+.hero__n span:first-child {
+  margin-right: 6px; /* "캡처" 라벨 ↔ 숫자 간격 */
 }
 .hero__scope {
   font-size: 14px;
@@ -788,6 +758,7 @@
 }
 .scopebtn {
   margin-top: 12px;
+  min-height: 44px; /* 탭타깃 */
   background: var(--surface);
   color: var(--primary);
   font-weight: 700;
@@ -796,20 +767,6 @@
   border-radius: 999px;
 }
 .toBookExport { margin-top: 8px; }
-.danger-link {
-  display: block;
-  width: 100%;
-  margin: 24px auto 8px;
-  padding: 12px;
-  min-height: 48px;
-  background: none;
-  border: none;
-  color: var(--sub);
-  font-size: 14px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
 .srow {
   display: flex;
   justify-content: space-between;
@@ -817,7 +774,7 @@
   padding: 9px 0;
   font-size: 15px;
   font-weight: 600;
-  border-top: 1px solid #e8ebed;
+  border-top: 1px solid var(--line);
 }
 .srow:first-of-type {
   border-top: none;
@@ -827,9 +784,6 @@
 }
 .srow.muted {
   color: var(--sub);
-}
-.srow.warn {
-  color: #d98300;
 }
 
 .caplist {
@@ -841,7 +795,7 @@
   align-items: center;
   gap: 12px;
   padding: 10px 0;
-  border-top: 1px solid #e8ebed;
+  border-top: 1px solid var(--line);
 }
 .capcard:first-child {
   border-top: none;
@@ -1016,12 +970,6 @@
 .tagpill.is-sel {
   background: var(--primary);
   color: #fff;
-}
-.detail__q {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 12px;
 }
 .detail__pagerow {
   display: flex;
@@ -1458,7 +1406,7 @@
 }
 
 .inp__hint--err {
-  color: #ff6b6b;
+  color: var(--danger);
 }
 
 /* 라이트 배경 tagrow — 입력 패널 + 편집 시트 공용 */
@@ -1508,7 +1456,7 @@
 /* ---- 앱 설치 버튼 + iOS 안내 시트 ---- */
 .home__install {
   display: block; width: 100%; min-height: 48px; margin-top: 8px;
-  background: #fff; border: 1px solid var(--line, #e5e8eb); border-radius: 14px;
+  background: #fff; border: 1px solid var(--line); border-radius: 14px;
   color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer;
 }
 .install-sheet {
@@ -1552,7 +1500,7 @@
 
 /* 책 선택 바텀시트 (bookpicker) */
 .bookpick { position: fixed; inset: 0; z-index: 60; background: rgba(25,31,40,0.4); display: grid; place-items: end center; padding: 16px; }
-.bookpick__card { background: #fff; border-radius: 20px 20px 16px 16px; width: 100%; max-width: 420px; padding: 18px 14px calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.bookpick__card { background: #fff; border-radius: 20px; width: 100%; max-width: 420px; padding: 18px 14px calc(env(safe-area-inset-bottom, 0px) + 14px); } /* 떠 있는 바텀 카드 — install-sheet과 동일한 대칭 라운드 */
 .bookpick__t { font-weight: 700; font-size: 16px; color: var(--ink); margin: 0 6px 12px; }
 .bookpick__list { max-height: 55vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; }
 .bookpick__row { display: flex; align-items: center; gap: 12px; min-height: 56px; background: var(--surface); border: none; border-radius: 12px; padding: 8px 12px; text-align: left; cursor: pointer; }

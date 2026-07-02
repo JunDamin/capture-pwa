@@ -24,13 +24,13 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     renderList();
   })();
 
-  function renderList() {
+  function renderList(toastMsg?: string) {
     urls.forEach((u) => URL.revokeObjectURL(u));
     urls.length = 0;
     root.innerHTML = `
     <div class="scr scr--light books">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">책장</div>
       </div>
 
@@ -46,7 +46,16 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
              <div class="recent">${books.map((b) => bookRow(b, urls)).join("")}</div>`
           : `<div class="hint-empty">아직 등록한 책이 없어요. 위에서 새 책을 추가하세요.</div>`
       }
+
+      <div class="toast" hidden></div>
     </div>`;
+
+    if (toastMsg) {
+      const toast = root.querySelector(".toast") as HTMLElement;
+      toast.textContent = toastMsg;
+      toast.hidden = false;
+      setTimeout(() => (toast.hidden = true), 2400);
+    }
 
     (root.querySelector(".back") as HTMLElement).onclick = () => nav({ name: "home" });
 
@@ -96,7 +105,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         const id = el.dataset.del!;
         const b = books.find((x) => x.uuid === id);
         const caps = await capturesForBook(id);
-        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 기록·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
+        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 기록·캡처 ${caps.length}개가 지워져요. 삭제할까요?`)) return;
         await deleteBook(id);
         books = await listBooks();
         renderList();
@@ -109,7 +118,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     root.innerHTML = `
     <div class="scr scr--light books">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">독서 시작</div>
       </div>
 
@@ -155,7 +164,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     root.innerHTML = `
     <div class="scr scr--light books">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">책 편집</div>
       </div>
 
@@ -194,7 +203,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
           const items = await searchBooks(q);
           renderCoverResults(items);
         } catch (e) {
-          flash(String(e).includes("aladin:") ? "키를 확인해주세요" : "표지를 찾지 못했어요");
+          flash(String(e).includes("aladin:") ? "키를 확인해 주세요" : "표지를 찾지 못했어요");
         } finally {
           findBtn.disabled = false;
           findBtn.textContent = "표지 찾기";
@@ -253,7 +262,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         isbn: isbnEl.value.trim() || undefined,
       });
       books = await listBooks();
-      renderList();
+      renderList("저장했어요");
     };
   }
 

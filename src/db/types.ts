@@ -26,6 +26,7 @@ export interface Session {
   started: number;
   ended: number | null; // 열린 세션 = null — ADR-005
   roundNo?: number | null; // 회독 번호 수정용 override — 표시 = roundNo ?? 계산
+  lastCaptureAt?: number; // 최근 캡처 시각 — recentBooks 정렬용, addCapture가 갱신 (선택 — 마이그레이션 불필요)
 }
 
 export interface Capture {
@@ -45,7 +46,7 @@ export interface Capture {
   exportStatus: "none" | "exported";
 }
 
-/** 유효성 — ADR-014: (image 또는 passage) + tag. memo는 레거시 호환. */
+/** 유효성 — ADR-014: (image ‖ passage ‖ memo) + tag. 생각(memo)만 저장하는 것도 1급 경로. */
 export function isValidCapture(c: Pick<Capture, "image" | "passage" | "memo" | "tag">): boolean {
   const hasContent =
     c.image != null ||

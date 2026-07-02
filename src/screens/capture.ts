@@ -574,9 +574,9 @@ function template(session: Session, bookTitle: string, startCount: number, initi
       <div class="input-panel__inner">
         <div class="inp__hint">한 가지 태그를 고르세요</div>
         <div class="tagrow tagrow--light inp__tagrow">${tags}</div>
-        <label class="inp__label">담고 싶은 글</label>
+        <label class="inp__label">담은 글</label>
         <textarea class="field inp__passage" rows="6" placeholder="담고 싶은 글 (선택)"></textarea>
-        <label class="inp__label">내 생각 (선택)</label>
+        <label class="inp__label">내 생각</label>
         <textarea class="field inp__note" rows="2" placeholder="내 생각·메모 (선택)"></textarea>
         <div class="pagerow">
           <label class="inp__label pagerow__l">페이지</label>
@@ -590,7 +590,7 @@ function template(session: Session, bookTitle: string, startCount: number, initi
       <div class="grab"></div>
       <div class="edsheet__scroll">
         <div class="ed__photo">
-          <img class="ed__photoimg" alt="" hidden />
+          <img class="ed__photoimg" alt="" aria-label="탭하면 확대" hidden />
           <div class="ed__photoph">📷</div>
           <button class="btn-ghost ed__retake">다시 찍기</button>
         </div>

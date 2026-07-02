@@ -88,7 +88,11 @@ export async function getSession(id: string) {
 
 // --- Captures ---
 export async function addCapture(c: Capture) {
-  await (await db()).put("captures", await toStored(c) as Capture);
+  const d = await db();
+  await d.put("captures", await toStored(c) as Capture);
+  // 세션에 최근 캡처 시각 기록 — recentBooks가 캡처 로드 없이 lastActivity 계산 (세션 레코드는 작음)
+  const s = await d.get("sessions", c.sessionId);
+  if (s) await d.put("sessions", { ...s, lastCaptureAt: c.createdAt });
   return c;
 }
 export async function getCapture(id: string): Promise<Capture | undefined> {
@@ -110,8 +114,8 @@ export async function deleteCapture(id: string) {
   await (await db()).delete("captures", id);
 }
 
-/** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. */
-export async function deleteSession(sessionId: string): Promise<void> {
+/** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. (deleteBook 내부 전용) */
+async function deleteSession(sessionId: string): Promise<void> {
   const caps = await capturesForSession(sessionId);
   const d = await db();
   for (const c of caps) await d.delete("captures", c.uuid);
@@ -146,11 +150,6 @@ export async function capturesForBook(bookId: string): Promise<Capture[]> {
   const all: Capture[] = [];
   for (const s of sessions) all.push(...(await capturesForSession(s.uuid)));
   return all.sort((a, b) => a.createdAt - b.createdAt);
-}
-
-export async function endSession(id: string, endedAt: number) {
-  const s = await getSession(id);
-  if (s && s.ended == null) await putSession({ ...s, ended: endedAt });
 }
 
 /** 그 책의 열린 회독만 종료(다른 책 무관). */
@@ -216,13 +215,11 @@ export async function recentBooks(n: number): Promise<BookView[]> {
     }
     const open = ss.filter((s) => s.ended == null).sort((a, b) => b.started - a.started);
     const currentRound = open[0] ?? null;
+    // 캡처 레코드 로드 없이 계산 — countFromIndex + Session.lastCaptureAt (이미지 실체화 제거)
     let captureCount = 0;
-    let lastActivity = Math.max(...ss.map((s) => s.started));
-    for (const s of ss) {
-      const caps = await capturesForSession(s.uuid);
-      captureCount += caps.length;
-      for (const c of caps) if (c.createdAt > lastActivity) lastActivity = c.createdAt;
-    }
+    for (const s of ss) captureCount += await countCaptures(s.uuid);
+    // 레거시(lastCaptureAt 없는 세션)는 started 폴백 — 새 캡처부터 자가 교정
+    const lastActivity = Math.max(...ss.map((s) => Math.max(s.started, s.lastCaptureAt ?? 0)));
     views.push({
       book,
       currentRound,

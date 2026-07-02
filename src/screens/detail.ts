@@ -12,6 +12,7 @@ export function mountDetail(
   from: { scope: Scope; id: string },
 ): () => void {
   const urls: string[] = [];
+  let backTimer: number | null = null; // 저장 후 지연 back 타이머 — cleanup에서 해제
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   // back은 진입한 from 유지 — 책을 바꾼 뒤엔 옛 Review에 이 캡처가 없을 수 있음(의도된 수용).
@@ -42,7 +43,7 @@ export function mountDetail(
     root.innerHTML = `
     <div class="scr scr--light detail">
       <div class="topbar">
-        <button class="iconbtn back">‹</button>
+        <button class="iconbtn back" aria-label="뒤로">‹</button>
         <div class="topbar__t">캡처</div>
       </div>
 
@@ -134,6 +135,8 @@ export function mountDetail(
     const memo = root.querySelector(".detail__memo") as HTMLTextAreaElement;
     const pageEl = root.querySelector(".detail__page") as HTMLInputElement;
     const tagEls = Array.from(root.querySelectorAll(".tagpill")) as HTMLElement[];
+    passageEl.oninput = () => passageEl.classList.remove("field--err");
+    memo.oninput = () => memo.classList.remove("field--err");
 
     tagEls.forEach((el) => {
       el.onclick = () => {
@@ -142,21 +145,31 @@ export function mountDetail(
       };
     });
 
-    (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
+    const saveBtn = root.querySelector(".save") as HTMLButtonElement;
+    saveBtn.onclick = async () => {
       const passageVal = passageEl.value.trim() || null;
       const memoVal = memo.value.trim() || null;
       const n = parseInt(pageEl.value, 10);
       const page = Number.isFinite(n) && n > 0 ? n : undefined;
       if (!isValidCapture({ image: cap.image, passage: passageVal, memo: memoVal, tag })) {
-        alert("담고 싶은 글이나 사진이 필요해요.");
+        // capture 패턴과 통일 — 내용 필드 표시 + 토스트(alert 금지)
+        passageEl.focus();
+        passageEl.classList.add("field--err");
+        memo.classList.add("field--err");
+        flash("담은 글이나 내 생각, 사진 중 하나는 필요해요");
         return;
       }
+      saveBtn.disabled = true; // 지연 back 동안 재저장 방지
       await updateCapture({ ...cap, tag, passage: passageVal, memo: memoVal, why: null, page, updatedAt: Date.now() });
-      back();
+      flash("저장했어요");
+      backTimer = window.setTimeout(back, 900); // 토스트가 보이도록 잠깐 머문 뒤 복귀
     };
   }
 
-  return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  return () => {
+    if (backTimer != null) clearTimeout(backTimer); // 이탈 후 지연 back이 사용자를 끌고가지 않게
+    urls.forEach((u) => URL.revokeObjectURL(u));
+  };
 }
 
 function esc(s: string) {

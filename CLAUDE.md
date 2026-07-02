@@ -22,13 +22,14 @@ npm run test:pdf  # PDF 생성 스모크(chromium/Playwright) — npx playwright
 - **인메모리 라우터:** `src/app.ts`가 전체 라우터. `mountApp(root)`이 `nav(route)`를 반환하고, 화면 전환 시 이전 화면의 cleanup(카메라 정지·objectURL revoke 등)을 호출한다. 히스토리/URL 라우팅 없음(브라우저 뒤로가기와 무관).
 - **화면(`src/screens/`):** 각 화면은 `mountX(root, nav, ...args): () => void`(cleanup 반환) 패턴. home / books(책·세션 시작) / capture(캡처 루프) / review(요약·Export 진입) / detail(캡처 상세·편집) / export(PDF·프롬프트) / transfer(백업·가져오기).
 - **도메인·저장(`src/db/`):** `types.ts`(Book/Session/Capture + `isValidCapture`), `db.ts`(idb 래퍼, 모든 put이 uuid keyPath upsert). Book 1:N Session, Session 1:N Capture.
-- **라이브러리(`src/lib/`):** `image.ts`(리사이즈/압축), `pdf.ts`(canvas 렌더 PDF), `prompt.ts`(Export 프롬프트 빌더), `share.ts`(Web Share/다운로드), `viewer.ts`(전체화면 줌/크롭), `backup.ts`(JSON 백업/복원), `budget.ts`(캡처 예산 계측).
-- **Export 파이프라인:** Review → `prompt.ts`가 prompt.md 텍스트 생성 → `pdf.ts`가 그 텍스트 + 사진을 단일 PDF로(AI에게 넘김). 외부 AI가 실제 분석 수행(앱은 분석 안 함, ADR-007).
+- **라이브러리(`src/lib/`):** `image.ts`(리사이즈/압축), `pdf.ts`(canvas 렌더 PDF), `prompt.ts`(Export 프롬프트 빌더), `share.ts`(Web Share/다운로드), `viewer.ts`(전체화면 줌/크롭), `backup.ts`(JSON 백업/복원), `budget.ts`(캡처 예산 계측), `install.ts`(PWA 설치+공유수신 mailbox), `aladin.ts`(알라딘 표지 검색 JSONP — ADR-017), `bookpicker.ts`(책 선택 시트), `cropframe.ts`(뷰파인더 크롭 프레임).
+- **Export 파이프라인:** Review → Export: **prompt.md는 클립보드로**(내보내기 탭 시 자동 복사, `prompt.ts` v4 — 원문 전사→"계속"→분석 다중 턴), **PDF는 자료 전용**(`pdf.ts` — 요약 표지 1장+사진). 둘을 함께 AI에 전달하는 2채널(ADR-019). 외부 AI가 분석(ADR-007).
 
 ## 핵심 도메인 모델 (ADR-014)
 
 `Capture` = `tag`(느낌, 1개·필수) + 내용(`image` 또는 `passage`(책에서 담은 글) 중 ≥1) + `memo`(note: 내 생각, 선택) + `page?`. `isValidCapture` = (image ‖ passage ‖ memo) && tag.
 - `why` 필드는 **deprecated(레거시 읽기 전용)** — 신규 캡처는 설정 금지(`why: null`), 표시/Export에서 note에 합쳐 보여줌. `WHY_CHIPS`는 제거됨.
+- 편집 시트의 사진 캡처는 사진이 콘텐츠(태그만 필수), 무사진이면 담은 글 ‖ 생각 필요(ADR-018).
 
 ## 반드시 지킬 프로젝트 규칙 (대부분 실기기에서 비싸게 배운 것)
 
@@ -41,7 +42,7 @@ npm run test:pdf  # PDF 생성 스모크(chromium/Playwright) — npx playwright
 
 ## 설계 기록·작업 산출물
 
-- **ADR:** `docs/decisions.md`(ADR-001~018). 도메인/아키텍처 결정은 여기서 확인하고, 새 결정은 같은 형식으로 추가.
+- **ADR:** `docs/decisions.md`(ADR-001~019). 도메인/아키텍처 결정은 여기서 확인하고, 새 결정은 같은 형식으로 추가.
 - **PRD/용어:** `PRD.md`, `docs/glossary.md`.
 - **spec/plan:** `docs/superpowers/specs/`, `docs/superpowers/plans/`(브레인스토밍→spec→plan→구현 워크플로 산출물).
 - 커밋·푸시는 사용자가 요청할 때. 기능 작업은 별도 브랜치/워크트리에서.
