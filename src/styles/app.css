@@ -502,6 +502,12 @@
   height: 50px;
   object-fit: cover;
 }
+.cover--img {
+  width: 64px;
+  height: 88px;
+  object-fit: cover;
+  padding: 0;
+}
 
 /* 표지 찾기 결과 (책 편집) */
 .coverres {
@@ -655,9 +661,21 @@
 }
 
 .sectit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   font-size: 15px;
   font-weight: 700;
   margin-bottom: 8px;
+}
+.home__books-link {
+  background: none;
+  border: none;
+  color: var(--sub);
+  font-size: 13px;
+  font-weight: 600;
+  min-height: 44px;
+  cursor: pointer;
 }
 .recent {
   display: flex;
@@ -737,6 +755,18 @@
 /* Review */
 .hero {
   padding: 8px 4px 18px;
+}
+.hero__head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.hero__cover {
+  width: 48px;
+  height: 64px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
 }
 .hero__n {
   font-size: 40px;

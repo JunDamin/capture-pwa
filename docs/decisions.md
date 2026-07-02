@@ -258,3 +258,22 @@
   - UI 문구 전면 교체: "세션" → "회독"(Export scopeLabel·PDF 파일명, 백업 복원 flash, 책 삭제 confirm, 회독 시작 화면).
   - 코드 식별자(`Session`, `sessionId`, `startNewSession` 등)는 호환성 위해 유지 — 용어 교체는 사용자 노출 문구·문서에 한정.
   - 열린 회독이 여럿인 레거시 데이터: `currentRoundFor`가 가장 최근 것을 선택해 자연 수렴.
+
+---
+
+## ADR-017 — 외부 API 예외: 알라딘 TTB로 책 표지 조회 (ADR-006·PRD §19 개정)
+
+- **상태:** 확정 (2026-07-02)
+- **맥락:** 수동 등록만으로는 표지가 그라데이션 박스뿐이라 책장·홈에서 책을 시각적으로 구분하기 어렵다. "서버·외부 API 없음"(ADR-006, PRD §19) 원칙은 유지 가치가 크지만, 표지 조회는 *책당 1회*의 저빈도 부가 기능이라 예외 비용이 낮다. 2026-07-02 실측으로 후보를 검증했다:
+  - **알라딘 TTB:** JSONP(`callback`) 정상 동작, 표지 이미지 CDN이 `Access-Control-Allow-Origin: *`라 fetch로 바이트 수신 가능. 한국서 커버리지 최상.
+  - **대안 전멸:** 카카오 책 검색 = API CORS는 되나 표지 이미지 CDN에 CORS 없음 → 바이트 저장 불가, 해상도도 낮음. 네이버 = API에 CORS 없음(서버 프록시 필요). Google Books = 무키 호출이 사실상 차단(429). OpenLibrary = 한국서 커버리지 사실상 없음.
+- **결정:**
+  - **알라딘 TTB API를 유일한 외부 API 예외로 허용**(`src/lib/aladin.ts`). 검색은 JSONP, 표지 다운로드는 CDN fetch(CORS `*`).
+  - **TTB 키는 사용자 입력** — 설정(백업·설정)에서 입력, `localStorage`(`capture.aladinTtbKey`) 저장. 공개 리포에 키를 커밋하지 않는다. **키가 없어도 앱 전 기능 정상**(표지 찾기 버튼만 미노출).
+  - **표지는 1회 수신 후 IndexedDB에 ArrayBuffer로 저장**(`Book.cover`/`coverType`, ADR-015 정합). 이후 표시·백업은 전부 로컬 — 오프라인 동작 유지, 외부 URL 상시 의존 없음.
+  - **JSONP 신뢰 트레이드오프 명기:** JSONP는 외부 스크립트 실행이라 알라딘 응답을 신뢰하는 구조다. 콜백 화이트리스트·타임아웃·응답 형태 검증으로 하드닝하되, 근본적으로 알라딘이 악의적이면 방어 불가 — 저빈도·사용자 개시 동작에 한정해 수용한다.
+- **ADR-006·PRD §19 개정 메모:** ADR-006의 "MVP 외부 API 없음" 근거와 PRD §19 Out of Scope의 해당 원칙을 **"외부 API 없음(예외: 알라딘 TTB 표지 조회, 사용자 키·1회 수신·로컬 저장)"**으로 개정. ISBN 바코드 스캔은 여전히 Phase 2+.
+- **함의:**
+  - 표지 렌더는 `cover instanceof ArrayBuffer` 가드 후 `Blob` 재구성 → objectURL `<img>`(ADR-013: `createImageBitmap`/`decode` 금지). objectURL은 화면 재렌더·cleanup에서 revoke.
+  - 백업 JSON은 표지를 base64로 직렬화/복원(라운드트립 보존).
+  - 네트워크 실패·키 오류는 표지 찾기 UI 안에서만 조용히 처리 — 캡처 루프·핵심 흐름에 영향 없음.

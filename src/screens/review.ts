@@ -13,7 +13,7 @@ import {
   sessionsForBook,
   startNewSession,
 } from "../db/db.ts";
-import { TAGS, type Capture, type Session } from "../db/types.ts";
+import { TAGS, type Book, type Capture, type Session } from "../db/types.ts";
 
 export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
   const urls: string[] = [];
@@ -21,6 +21,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
 
   let bookId = "";
   let title = "";
+  let book: Book | null = null;
   let session: Session | null = null;
   let currentRound: Session | null = null;
   let currentRoundNo = 0;
@@ -33,7 +34,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       if (!s) return nav({ name: "home" });
       session = s;
       bookId = s.bookId;
-      const book = await getBook(s.bookId);
+      book = (await getBook(s.bookId)) ?? null;
       title = book?.title ?? "(책)";
       const ss = await sessionsForBook(s.bookId);
       currentRound = s;
@@ -41,7 +42,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       caps = await capturesForSession(id);
     } else {
       bookId = id;
-      const book = await getBook(id);
+      book = (await getBook(id)) ?? null;
       title = book?.title ?? "(책)";
       const ss = await sessionsForBook(id);
       currentRound = ss.filter((s) => s.ended == null).sort((a, b) => b.started - a.started)[0] ?? null;
@@ -73,6 +74,13 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       return n ? `<div class="srow"><span>${t.emoji} ${t.label}</span><b>${n}</b></div>` : "";
     }).join("");
 
+    let heroCover = "";
+    if (book?.cover instanceof ArrayBuffer) {
+      const u = URL.createObjectURL(new Blob([book.cover], { type: book.coverType ?? "image/jpeg" }));
+      urls.push(u);
+      heroCover = `<img class="hero__cover" src="${u}" alt="" />`;
+    }
+
     const listHtml =
       scope === "book"
         ? groups
@@ -94,9 +102,14 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       </div>
 
       <div class="hero">
-        <div class="hero__n">${caps.length}<span>개의 Capture</span></div>
-        <div class="hero__scope">${scopeLabel}</div>
-        ${scope === "book" ? `<div class="hero__round">${roundBadge}</div>` : ""}
+        <div class="hero__head">
+          ${heroCover}
+          <div>
+            <div class="hero__n">${caps.length}<span>개의 Capture</span></div>
+            <div class="hero__scope">${scopeLabel}</div>
+            ${scope === "book" ? `<div class="hero__round">${roundBadge}</div>` : ""}
+          </div>
+        </div>
         ${
           scope === "session"
             ? `<button class="scopebtn toBook">이 책 전체 보기 ›</button>
