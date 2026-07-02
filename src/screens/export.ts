@@ -27,7 +27,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         bookTitle: book?.title ?? "(책)",
         author: book?.author,
         project: s.project,
-        scopeLabel: "이번 회독",
+        scopeLabel: "최근 기록",
         captures: caps,
       };
     } else {
@@ -91,7 +91,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
         // 클립보드 복사를 먼저: iOS Safari는 buildPdf await 이후 제스처 활성화가 만료됨
         const copied = await copyText(pkg.promptMd);
         const safe = title.replace(/[^\p{L}\p{N}._-]+/gu, "_").slice(0, 40);
-        const name = `독서캡처-${safe}-${scope === "session" ? "회독" : "책"}.pdf`;
+        const name = `독서캡처-${safe}-${scope === "session" ? "기록" : "책"}.pdf`;
         const blob = await buildPdf(ctx);
         const file = { name, blob };
         if (canShareFiles([file])) {

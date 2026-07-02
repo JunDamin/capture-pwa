@@ -1,7 +1,8 @@
 /** 캡처 상세 + 편집 — 큰 사진 + 태그/왜/메모/페이지 수정. PRD §8, ADR-004. */
 import type { Nav, Scope } from "../app.ts";
-import { getCapture, updateCapture } from "../db/db.ts";
-import { TAGS, isValidCapture, type Capture, type Tag } from "../db/types.ts";
+import { currentRoundFor, getBook, getCapture, getSession, updateCapture } from "../db/db.ts";
+import { TAGS, isValidCapture, type Book, type Capture, type Tag } from "../db/types.ts";
+import { openBookPicker } from "../lib/bookpicker.ts";
 import { openImageViewer } from "../lib/viewer.ts";
 
 export function mountDetail(
@@ -13,15 +14,19 @@ export function mountDetail(
   const urls: string[] = [];
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
+  // back은 진입한 from 유지 — 책을 바꾼 뒤엔 옛 Review에 이 캡처가 없을 수 있음(의도된 수용).
   const back = () => nav({ name: "review", scope: from.scope, id: from.id });
 
   (async () => {
     const cap = await getCapture(captureId);
     if (!cap) return back();
-    render(cap);
+    const session = await getSession(cap.sessionId);
+    const book = session ? await getBook(session.bookId) : null;
+    render(cap, book ?? null);
   })();
 
-  function render(cap: Capture) {
+  function render(cap: Capture, initialBook: Book | null) {
+    let book: Book | null = initialBook;
     let tag: Tag = cap.tag;
     let lastCropUrl: string | null = null;
 
@@ -63,9 +68,15 @@ export function mountDetail(
         <input class="field detail__page" type="number" inputmode="numeric" min="1" placeholder="선택" value="${cap.page ?? ""}" />
       </div>
 
+      <div class="card detail__bookrow">
+        <span class="detail__book">📚 ${esc(book?.title ?? "(책)")}</span>
+        <button class="btn-ghost bookchange">책 바꾸기</button>
+      </div>
+
       <div class="detail__stamp">${stamp}</div>
 
       <button class="btn-primary save">저장</button>
+      <div class="toast" hidden></div>
     </div>`;
 
     if (cap.image) {
@@ -98,6 +109,29 @@ export function mountDetail(
     }
 
     (root.querySelector(".back") as HTMLElement).onclick = back;
+
+    const flash = (msg: string) => {
+      const toast = root.querySelector(".toast") as HTMLElement | null;
+      if (!toast) return; // 화면 이탈 후 늦은 응답 — 무시
+      toast.textContent = msg;
+      toast.hidden = false;
+      setTimeout(() => (toast.hidden = true), 2400);
+    };
+
+    // 책 바꾸기 — 캡처를 선택한 책의 현재 회독으로 이동
+    const bookNameEl = root.querySelector(".detail__book") as HTMLElement;
+    (root.querySelector(".bookchange") as HTMLButtonElement).onclick = () =>
+      openBookPicker({
+        currentBookId: book?.uuid,
+        onPick: async (b) => {
+          cap.sessionId = await currentRoundFor(b.uuid);
+          cap.updatedAt = Date.now();
+          await updateCapture(cap);
+          book = b; // 로컬 갱신 — 이후 저장 스프레드에도 새 sessionId 반영됨
+          bookNameEl.textContent = `📚 ${b.title}`;
+          flash(`『${b.title}』(으)로 옮겼어요`);
+        },
+      });
 
     const passageEl = root.querySelector(".detail__passage") as HTMLTextAreaElement;
     const memo = root.querySelector(".detail__memo") as HTMLTextAreaElement;

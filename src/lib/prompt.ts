@@ -11,7 +11,7 @@ export interface ExportContext {
   bookTitle: string;
   author?: string;
   project?: string;
-  scopeLabel: string; // "이번 회독" | "이 책 전체"
+  scopeLabel: string; // "최근 기록" | "이 책 전체"
   captures: Capture[];
 }
 

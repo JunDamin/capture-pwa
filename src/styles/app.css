@@ -786,16 +786,12 @@
   font-weight: 600;
   margin-top: 2px;
 }
-.hero__round {
-  font-size: 13px;
-  color: var(--sub);
-  margin-top: 4px;
-}
-.roundsep {
+.datesep {
   text-align: center;
   color: var(--sub);
-  font-size: 12px;
-  margin: 14px 0 6px;
+  font-size: 11px;
+  opacity: 0.8;
+  margin: 12px 0 4px;
 }
 .scopebtn {
   margin-top: 12px;
@@ -965,6 +961,7 @@
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   z-index: 20;
+  pointer-events: none; /* 비대화형 — 저장 버튼 등 아래 UI 탭 통과 */
 }
 
 /* 카메라 pill 내 버튼 (홈/리뷰) */
@@ -1043,6 +1040,27 @@
   width: 120px;
   text-align: right;
 }
+.detail__bookrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail__book {
+  color: var(--sub);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail__bookrow .btn-ghost {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
 .detail__stamp {
   color: var(--sub);
   font-size: 13px;
@@ -1087,11 +1105,6 @@
   opacity: 0.7;
 }
 
-.review__editproj {
-  margin-left: auto;
-  min-width: 48px;
-  min-height: 48px;
-}
 
 /* --- 가로(landscape) — 카메라+사진 집중 --- */
 @media (orientation: landscape) {
@@ -1355,6 +1368,18 @@
   color: rgba(0, 0, 0, 0.25);
 }
 
+/* 입력 모드에서만 pill 제목이 책 전환 트리거 — 히트영역 ≥48px, ▾ 힌트 */
+.cam.mode--input .pill__title {
+  cursor: pointer;
+  padding: 12px 4px;
+  margin: -12px -4px;
+}
+.cam.mode--input .pill__title::after {
+  content: " ▾";
+  color: var(--sub);
+  font-size: 11px;
+}
+
 .cam.mode--input .pill .cnt {
   background: rgba(0, 0, 0, 0.07);
   color: var(--ink);
@@ -1521,4 +1546,17 @@
 .cropframe__grid .cf-v2 { left: 66.67%; top: 0; bottom: 0; width: 1px; }
 .cropframe__grid .cf-h1 { top: 33.33%; left: 0; right: 0; height: 1px; }
 .cropframe__grid .cf-h2 { top: 66.67%; left: 0; right: 0; height: 1px; }
-.cam.is-frozen .cropframe { display: none; }
+/* 동결(is-frozen) 중에도 크롭 프레임 유지 — 무엇이 저장될지 보여준다.
+   동결 중 프레임 조정도 저장에 반영됨(저장이 getRect()를 저장 시점에 읽음 — 의도). */
+
+/* 책 선택 바텀시트 (bookpicker) */
+.bookpick { position: fixed; inset: 0; z-index: 60; background: rgba(25,31,40,0.4); display: grid; place-items: end center; padding: 16px; }
+.bookpick__card { background: #fff; border-radius: 20px 20px 16px 16px; width: 100%; max-width: 420px; padding: 18px 14px calc(env(safe-area-inset-bottom, 0px) + 14px); }
+.bookpick__t { font-weight: 700; font-size: 16px; color: var(--ink); margin: 0 6px 12px; }
+.bookpick__list { max-height: 55vh; overflow-y: auto; -webkit-overflow-scrolling: touch; display: flex; flex-direction: column; gap: 6px; }
+.bookpick__row { display: flex; align-items: center; gap: 12px; min-height: 56px; background: var(--surface); border: none; border-radius: 12px; padding: 8px 12px; text-align: left; cursor: pointer; }
+.bookpick__row .mini { flex-shrink: 0; }
+.bookpick__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.bookpick__title { font-size: 15px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bookpick__sub { font-size: 12px; color: var(--sub); }
+.bookpick__check { margin-left: auto; color: var(--primary); font-weight: 700; }
