@@ -88,7 +88,11 @@ export async function getSession(id: string) {
 
 // --- Captures ---
 export async function addCapture(c: Capture) {
-  await (await db()).put("captures", await toStored(c) as Capture);
+  const d = await db();
+  await d.put("captures", await toStored(c) as Capture);
+  // 세션에 최근 캡처 시각 기록 — recentBooks가 캡처 로드 없이 lastActivity 계산 (세션 레코드는 작음)
+  const s = await d.get("sessions", c.sessionId);
+  if (s) await d.put("sessions", { ...s, lastCaptureAt: c.createdAt });
   return c;
 }
 export async function getCapture(id: string): Promise<Capture | undefined> {
@@ -211,13 +215,11 @@ export async function recentBooks(n: number): Promise<BookView[]> {
     }
     const open = ss.filter((s) => s.ended == null).sort((a, b) => b.started - a.started);
     const currentRound = open[0] ?? null;
+    // 캡처 레코드 로드 없이 계산 — countFromIndex + Session.lastCaptureAt (이미지 실체화 제거)
     let captureCount = 0;
-    let lastActivity = Math.max(...ss.map((s) => s.started));
-    for (const s of ss) {
-      const caps = await capturesForSession(s.uuid);
-      captureCount += caps.length;
-      for (const c of caps) if (c.createdAt > lastActivity) lastActivity = c.createdAt;
-    }
+    for (const s of ss) captureCount += await countCaptures(s.uuid);
+    // 레거시(lastCaptureAt 없는 세션)는 started 폴백 — 새 캡처부터 자가 교정
+    const lastActivity = Math.max(...ss.map((s) => Math.max(s.started, s.lastCaptureAt ?? 0)));
     views.push({
       book,
       currentRound,

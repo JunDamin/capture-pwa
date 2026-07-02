@@ -26,6 +26,7 @@ export interface Session {
   started: number;
   ended: number | null; // 열린 세션 = null — ADR-005
   roundNo?: number | null; // 회독 번호 수정용 override — 표시 = roundNo ?? 계산
+  lastCaptureAt?: number; // 최근 캡처 시각 — recentBooks 정렬용, addCapture가 갱신 (선택 — 마이그레이션 불필요)
 }
 
 export interface Capture {
