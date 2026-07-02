@@ -44,10 +44,13 @@ export async function fetchCover(coverUrl: string): Promise<{ buf: ArrayBuffer; 
 - **[검토 8 채택] v1은 ✎ 편집 폼에만** "표지 찾기" 버튼(키 있을 때만 노출) — 신규 등록 흐름의 미저장 상태 저글링 회피(등록 후 ✎ 한 탭이면 충분). → `searchBooks(title)` → 결과 시트(표지 썸네일 `<img>` 핫링크+제목+저자, 최대 10) → 선택 → `fetchCover` → `book.cover/coverType` 저장(putBook) → 재렌더. fetch 실패 시 저장 안 함 + 토스트 + 시트 유지(재시도).
 - 검색 실패/0건/타임아웃 → 토스트("표지를 찾지 못했어요"). 표지는 언제든 재검색으로 교체.
 - 화면 이탈 중 in-flight JSONP: 결과 핸들러가 해체된 root를 만지지 않게 alive 플래그(또는 cleanup에서 무시).
-- **ISBN 자동 채움(추가 요구):** 표지 선택 시 알라딘 결과의 `isbn13`을 — **책의 isbn이 비어 있을 때만** — 함께 저장(기존 값 덮어쓰지 않음).
+- **ISBN 자동 채움(추가 요구, 델타검토 Adj-3·4):** 판정 기준은 저장된 `book.isbn`이 아니라 **표지 선택 시점의 편집 폼 필드 `isbnEl.value.trim()`**(폼이 단일 진실 — 미저장 입력과의 레이스 제거). 필드가 비어 있고 `isbn13`이 truthy면 → **필드도 채우고** `putBook`에 함께 저장; 필드에 값이 있으면 isbn은 건드리지 않음(cover만 저장); `isbn13`이 빈 문자열이면 조용히 스킵.
 
 ### 3b. 홈 "책장" 진입점 (발견성 — 추가 요구)
-- 책 관리(삭제·편집·ISBN)가 "▶ 독서 시작" 뒤에 숨어 발견 안 되는 문제. 홈의 "다른 책" 섹션 타이틀 줄에 **"책장 →"** 텍스트 링크(→ `nav books`) 추가. 책이 1권 이하라 섹션이 없으면 CTA만으로 충분(책장이 곧 다음 화면).
+- 책 관리(삭제·편집·ISBN)가 "▶ 독서 시작" 뒤에 숨어 발견 안 되는 문제 + `recentBooks(8)` 제한으로 9권째부터는 홈에 아예 안 보임 → 진입점 필요.
+- 홈 "다른 책" 섹션 타이틀 줄 우측에 **"책장 →"** 링크(→ `nav books`). rest가 없으면(책 ≤1) 미표시 — CTA로 충분.
+- **[Adj-1] CSS:** `.sectit`을 `display:flex; justify-content:space-between; align-items:center;`로(books.ts의 단독 자식 `.sectit`엔 무해 — 확인됨).
+- **[Adj-2] 배선:** `[data-book]` 위임이 아니라 **전용 셀렉터**(`.home__books-link`) 직접 핸들러로(위임 루프와 충돌 없음 확인됨).
 
 ### 4. 표시 — 홈/책장/Review
 - `cover instanceof ArrayBuffer`일 때 기존 이니셜 박스(`.cover`/`.mini`) 대신 `<img>`(objectURL). **이미지는 `<img>`만 — createImageBitmap/decode 금지(ADR-013).**
