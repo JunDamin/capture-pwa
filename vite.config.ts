@@ -36,6 +36,11 @@ export default defineConfig({
           { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
         ],
+        share_target: {
+          action: "./",
+          method: "GET",
+          params: { title: "shared_title", text: "shared_text", url: "shared_url" },
+        },
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],

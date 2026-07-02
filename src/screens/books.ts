@@ -9,6 +9,7 @@ import {
   uuid,
 } from "../db/db.ts";
 import type { Book } from "../db/types.ts";
+import { hasPendingSharedText } from "../lib/install.ts";
 
 export function mountBooks(root: HTMLElement, nav: Nav): () => void {
   let books: Book[] = [];
@@ -91,6 +92,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
   }
 
   function renderProject() {
+    let selectedMode: "photo" | "input" = hasPendingSharedText() ? "input" : "photo";
     root.innerHTML = `
     <div class="scr scr--light books">
       <div class="topbar">
@@ -107,8 +109,8 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         <div class="proj__hint">목적은 캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
         <label class="proj__label">시작 모드</label>
         <div class="mode-toggle mode-toggle--light proj__modesel">
-          <button class="mode-btn mode-btn--photo is-active" aria-label="사진 모드">📷 사진</button>
-          <button class="mode-btn mode-btn--input" aria-label="입력 모드">✍️ 입력</button>
+          <button class="mode-btn mode-btn--photo${selectedMode === "photo" ? " is-active" : ""}" aria-label="사진 모드">📷 사진</button>
+          <button class="mode-btn mode-btn--input${selectedMode === "input" ? " is-active" : ""}" aria-label="입력 모드">✍️ 입력</button>
         </div>
         <button class="btn-primary start">세션 시작</button>
       </div>
@@ -117,8 +119,6 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
     const projEl = root.querySelector(".project") as HTMLInputElement;
     projEl.focus();
-
-    let selectedMode: "photo" | "input" = "photo";
     const modeBtnPhoto = root.querySelector(".mode-btn--photo") as HTMLButtonElement;
     const modeBtnInput = root.querySelector(".mode-btn--input") as HTMLButtonElement;
     modeBtnPhoto.onclick = () => {
