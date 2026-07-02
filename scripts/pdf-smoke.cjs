@@ -13,7 +13,7 @@
 const { spawn } = require("child_process");
 const http = require("http");
 
-const URL = "http://localhost:5173/";
+const URL = "http://localhost:5219/"; // 전용 포트(잔류 dev 서버와 충돌 방지)
 
 function waitForServer(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -73,7 +73,7 @@ async function run() {
 }
 
 (async () => {
-  const dev = spawn("npm", ["run", "dev"], { stdio: "ignore" });
+  const dev = spawn("npm", ["run", "dev", "--", "--port", "5219", "--strictPort"], { stdio: "ignore" });
   let code = 0;
   try {
     await waitForServer(20000);
