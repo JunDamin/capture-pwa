@@ -148,36 +148,6 @@ export async function capturesForBook(bookId: string): Promise<Capture[]> {
   return all.sort((a, b) => a.createdAt - b.createdAt);
 }
 
-export interface SessionView {
-  session: Session;
-  bookTitle: string;
-  count: number;
-  lastActivity: number;
-}
-
-async function toView(s: Session): Promise<SessionView> {
-  const caps = await capturesForSession(s.uuid);
-  const book = await getBook(s.bookId);
-  const lastActivity = caps.reduce((m, c) => Math.max(m, c.createdAt), s.started);
-  return { session: s, bookTitle: book?.title ?? "(삭제된 책)", count: caps.length, lastActivity };
-}
-
-/** 최근 세션 — 마지막 활동 기준 내림차순. */
-export async function recentSessions(limit = 10): Promise<SessionView[]> {
-  const all = await (await db()).getAll("sessions");
-  const views = await Promise.all(all.map(toView));
-  return views.sort((a, b) => b.lastActivity - a.lastActivity).slice(0, limit);
-}
-
-/** 열린(미종료) 세션 중 가장 최근 것 — 이어읽기 대상. */
-export async function openSession(): Promise<SessionView | null> {
-  const open = (await (await db()).getAll("sessions")).filter((s) => s.ended == null);
-  if (!open.length) return null;
-  const views = await Promise.all(open.map(toView));
-  views.sort((a, b) => b.lastActivity - a.lastActivity);
-  return views[0];
-}
-
 export async function endSession(id: string, endedAt: number) {
   const s = await getSession(id);
   if (s && s.ended == null) await putSession({ ...s, ended: endedAt });
