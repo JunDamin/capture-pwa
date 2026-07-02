@@ -44,6 +44,10 @@ export async function fetchCover(coverUrl: string): Promise<{ buf: ArrayBuffer; 
 - **[검토 8 채택] v1은 ✎ 편집 폼에만** "표지 찾기" 버튼(키 있을 때만 노출) — 신규 등록 흐름의 미저장 상태 저글링 회피(등록 후 ✎ 한 탭이면 충분). → `searchBooks(title)` → 결과 시트(표지 썸네일 `<img>` 핫링크+제목+저자, 최대 10) → 선택 → `fetchCover` → `book.cover/coverType` 저장(putBook) → 재렌더. fetch 실패 시 저장 안 함 + 토스트 + 시트 유지(재시도).
 - 검색 실패/0건/타임아웃 → 토스트("표지를 찾지 못했어요"). 표지는 언제든 재검색으로 교체.
 - 화면 이탈 중 in-flight JSONP: 결과 핸들러가 해체된 root를 만지지 않게 alive 플래그(또는 cleanup에서 무시).
+- **ISBN 자동 채움(추가 요구):** 표지 선택 시 알라딘 결과의 `isbn13`을 — **책의 isbn이 비어 있을 때만** — 함께 저장(기존 값 덮어쓰지 않음).
+
+### 3b. 홈 "책장" 진입점 (발견성 — 추가 요구)
+- 책 관리(삭제·편집·ISBN)가 "▶ 독서 시작" 뒤에 숨어 발견 안 되는 문제. 홈의 "다른 책" 섹션 타이틀 줄에 **"책장 →"** 텍스트 링크(→ `nav books`) 추가. 책이 1권 이하라 섹션이 없으면 CTA만으로 충분(책장이 곧 다음 화면).
 
 ### 4. 표시 — 홈/책장/Review
 - `cover instanceof ArrayBuffer`일 때 기존 이니셜 박스(`.cover`/`.mini`) 대신 `<img>`(objectURL). **이미지는 `<img>`만 — createImageBitmap/decode 금지(ADR-013).**
