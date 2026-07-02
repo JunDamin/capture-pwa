@@ -1,7 +1,7 @@
-/** Export — prompt.md + 사진 공유(ADR-008). 1순위 Web Share, 보조 복사/다운로드. PRD §8-D. */
+/** Export — PDF(자료)+클립보드 프롬프트 2채널(ADR-019). 1순위 Web Share, 보조 복사·다운로드. PRD §8-D. */
 import type { Nav, Scope } from "../app.ts";
 import {
-  addCapture,
+  updateCapture,
   capturesForBook,
   capturesForSession,
   getBook,
@@ -128,7 +128,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
 
   async function markExported(caps: Capture[]) {
     for (const c of caps) {
-      if (c.exportStatus !== "exported") await addCapture({ ...c, exportStatus: "exported" });
+      if (c.exportStatus !== "exported") await updateCapture({ ...c, exportStatus: "exported" });
     }
   }
 

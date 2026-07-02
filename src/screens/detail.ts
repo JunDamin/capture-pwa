@@ -12,6 +12,7 @@ export function mountDetail(
   from: { scope: Scope; id: string },
 ): () => void {
   const urls: string[] = [];
+  let backTimer: number | null = null; // 저장 후 지연 back 타이머 — cleanup에서 해제
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   // back은 진입한 from 유지 — 책을 바꾼 뒤엔 옛 Review에 이 캡처가 없을 수 있음(의도된 수용).
@@ -161,11 +162,14 @@ export function mountDetail(
       saveBtn.disabled = true; // 지연 back 동안 재저장 방지
       await updateCapture({ ...cap, tag, passage: passageVal, memo: memoVal, why: null, page, updatedAt: Date.now() });
       flash("저장했어요");
-      setTimeout(back, 900); // 토스트가 보이도록 잠깐 머문 뒤 복귀
+      backTimer = window.setTimeout(back, 900); // 토스트가 보이도록 잠깐 머문 뒤 복귀
     };
   }
 
-  return () => urls.forEach((u) => URL.revokeObjectURL(u));
+  return () => {
+    if (backTimer != null) clearTimeout(backTimer); // 이탈 후 지연 back이 사용자를 끌고가지 않게
+    urls.forEach((u) => URL.revokeObjectURL(u));
+  };
 }
 
 function esc(s: string) {
