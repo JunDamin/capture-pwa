@@ -14,7 +14,7 @@ export function mountTransfer(root: HTMLElement, nav: Nav): () => void {
 
     <div class="card">
       <div class="card__h">백업</div>
-      <div class="exp__how">모든 책·회독·캡처(사진 포함)를 파일 하나로 내려받아요. 다른 기기에서 가져오기로 복원할 수 있어요.</div>
+      <div class="exp__how">모든 책·기록·캡처(사진 포함)를 파일 하나로 내려받아요. 다른 기기에서 가져오기로 복원할 수 있어요.</div>
       <button class="btn-primary backup">💾 백업 파일 내려받기</button>
     </div>
 
@@ -66,7 +66,7 @@ export function mountTransfer(root: HTMLElement, nav: Nav): () => void {
     try {
       const text = await f.text();
       const r = await importBackup(text);
-      flash(`책 ${r.books} · 회독 ${r.sessions} · 캡처 ${r.captures} 복원했어요`);
+      flash(`책 ${r.books} · 기록 ${r.sessions} · 캡처 ${r.captures} 복원했어요`);
     } catch (e) {
       console.error("import failed", e);
       flash("백업 파일을 읽지 못했어요(형식 확인)");

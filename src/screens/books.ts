@@ -96,7 +96,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         const id = el.dataset.del!;
         const b = books.find((x) => x.uuid === id);
         const caps = await capturesForBook(id);
-        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 회독·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
+        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 기록·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
         await deleteBook(id);
         books = await listBooks();
         renderList();
@@ -110,7 +110,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     <div class="scr scr--light books">
       <div class="topbar">
         <button class="iconbtn back">‹</button>
-        <div class="topbar__t">회독 시작</div>
+        <div class="topbar__t">독서 시작</div>
       </div>
 
       <div class="card">
@@ -118,14 +118,14 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
           chosen!.author ? ` <span class="proj__author">· ${esc(chosen!.author)}</span>` : ""
         }</div>
         <label class="proj__label">왜 이 책을 읽나요? <span class="opt">선택</span></label>
-        <input class="field project" placeholder="회독 제목 (선택)" autocomplete="off" />
+        <input class="field project" placeholder="목적 (선택)" autocomplete="off" />
         <div class="proj__hint">목적은 캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
         <label class="proj__label">시작 모드</label>
         <div class="mode-toggle mode-toggle--light proj__modesel">
           <button class="mode-btn mode-btn--photo${selectedMode === "photo" ? " is-active" : ""}" aria-label="사진 모드">📷 사진</button>
           <button class="mode-btn mode-btn--input${selectedMode === "input" ? " is-active" : ""}" aria-label="입력 모드">✍️ 입력</button>
         </div>
-        <button class="btn-primary start">회독 시작</button>
+        <button class="btn-primary start">독서 시작</button>
       </div>
     </div>`;
 

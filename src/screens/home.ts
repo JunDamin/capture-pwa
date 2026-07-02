@@ -1,4 +1,4 @@
-/** Home — 최근 책 목록(회독 배지). PRD §8-A, 토스 라이트. */
+/** Home — 최근 책 목록. PRD §8-A, 토스 라이트. */
 import type { Nav } from "../app.ts";
 import { recentBooks, currentRoundFor, type BookView } from "../db/db.ts";
 import { isStandalone, promptInstall } from "../lib/install.ts";
@@ -85,12 +85,6 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     });
   }
 
-  function roundLabel(v: BookView): string {
-    if (!v.totalRounds) return "캡처 전";
-    const t = v.currentRound?.project ? ` · ${esc(v.currentRound.project)}` : "";
-    return `${v.roundNumber}회독${t}`;
-  }
-
   function coverHtml(v: BookView, cls: "cover" | "mini", fallback: string): string {
     if (v.book.cover instanceof ArrayBuffer) {
       const u = URL.createObjectURL(new Blob([v.book.cover], { type: v.book.coverType ?? "image/jpeg" }));
@@ -107,7 +101,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
         ${coverHtml(v, "cover", `<div class="cover cov-1">${esc(v.book.title).slice(0, 6)}</div>`)}
         <div class="bookcard__body">
           <div class="booktitle">${esc(v.book.title)}</div>
-          <div class="sessionchip"><span class="dot"></span>${roundLabel(v)} · ${v.captureCount} Captures</div>
+          <div class="sessionchip"><span class="dot"></span>${v.captureCount} Captures</div>
         </div>
         <div class="chev">›</div>
       </div>
@@ -125,7 +119,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
         ${coverHtml(v, "mini", `<div class="mini ${coverClass(i)}"></div>`)}
         <div class="item__body">
           <div class="item__t">${esc(v.book.title)}</div>
-          <div class="item__s">${roundLabel(v)} · ${v.captureCount} captures</div>
+          <div class="item__s">${v.captureCount} captures</div>
         </div>
         <div class="item__when">${v.lastActivity ? relTime(v.lastActivity) : ""}</div>
       </div>
