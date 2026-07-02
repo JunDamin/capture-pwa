@@ -708,6 +708,17 @@
   font-weight: 600;
   margin-top: 2px;
 }
+.hero__round {
+  font-size: 13px;
+  color: var(--sub);
+  margin-top: 4px;
+}
+.roundsep {
+  text-align: center;
+  color: var(--sub);
+  font-size: 12px;
+  margin: 14px 0 6px;
+}
 .scopebtn {
   margin-top: 12px;
   background: var(--surface);
