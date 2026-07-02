@@ -1392,9 +1392,9 @@
 
 /* ---- 앱 설치 버튼 + iOS 안내 시트 ---- */
 .home__install {
-  display: block; width: 100%; min-height: 44px; margin-top: 8px;
-  background: none; border: none; color: var(--sub); font-size: 14px;
-  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+  display: block; width: 100%; min-height: 48px; margin-top: 8px;
+  background: #fff; border: 1px solid var(--line, #e5e8eb); border-radius: 14px;
+  color: var(--ink); font-size: 15px; font-weight: 600; cursor: pointer;
 }
 .install-sheet {
   position: fixed; inset: 0; z-index: 50; background: rgba(25,31,40,0.4);

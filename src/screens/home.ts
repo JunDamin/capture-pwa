@@ -49,7 +49,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
              <div class="recent">${rest.map(recentItem).join("")}</div>`
           : ""
       }
-      ${isStandalone() ? "" : `<button class="home__install">앱 설치</button>`}
+      ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
       <button class="home__transfer">백업·가져오기</button>
       <div class="home__ver">build ${__BUILD__}</div>
     </div>`;
