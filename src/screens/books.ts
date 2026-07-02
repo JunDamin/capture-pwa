@@ -10,11 +10,13 @@ import {
   uuid,
 } from "../db/db.ts";
 import type { Book } from "../db/types.ts";
+import { type AladinItem, fetchCover, getTtbKey, searchBooks } from "../lib/aladin.ts";
 import { hasPendingSharedText } from "../lib/install.ts";
 
 export function mountBooks(root: HTMLElement, nav: Nav): () => void {
   let books: Book[] = [];
   let chosen: Book | null = null; // 선택/생성된 책 → 프로젝트 단계
+  const urls: string[] = []; // 표지 objectURL — 재렌더/이탈 시 revoke
 
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
   (async () => {
@@ -23,6 +25,8 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
   })();
 
   function renderList() {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+    urls.length = 0;
     root.innerHTML = `
     <div class="scr scr--light books">
       <div class="topbar">
@@ -39,7 +43,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
       ${
         books.length
           ? `<div class="sectit">내 책</div>
-             <div class="recent">${books.map(bookRow).join("")}</div>`
+             <div class="recent">${books.map((b) => bookRow(b, urls)).join("")}</div>`
           : `<div class="hint-empty">아직 등록한 책이 없어요. 위에서 새 책을 추가하세요.</div>`
       }
     </div>`;
@@ -159,15 +163,82 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         <input class="field e-title" placeholder="책 제목" autocomplete="off" value="${esc(book.title)}" />
         <input class="field e-author" placeholder="저자 (선택)" autocomplete="off" value="${esc(book.author ?? "")}" />
         <input class="field e-isbn" placeholder="ISBN (선택)" autocomplete="off" value="${esc(book.isbn ?? "")}" />
+        ${getTtbKey() ? `<button class="btn-ghost coverfind">표지 찾기</button><div class="coverres"></div>` : ""}
         <button class="btn-primary save">저장</button>
       </div>
+
+      <div class="toast" hidden></div>
     </div>`;
+
+    const flash = (msg: string) => {
+      const toast = root.querySelector(".toast") as HTMLElement | null;
+      if (!toast) return; // 화면 이탈 후 늦은 응답 — 무시
+      toast.textContent = msg;
+      toast.hidden = false;
+      setTimeout(() => (toast.hidden = true), 2400);
+    };
 
     (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
     const titleEl = root.querySelector(".e-title") as HTMLInputElement;
     const authorEl = root.querySelector(".e-author") as HTMLInputElement;
     const isbnEl = root.querySelector(".e-isbn") as HTMLInputElement;
     titleEl.oninput = () => titleEl.classList.remove("field--err");
+
+    const findBtn = root.querySelector(".coverfind") as HTMLButtonElement | null;
+    if (findBtn)
+      findBtn.onclick = async () => {
+        const q = titleEl.value.trim() || book.title;
+        findBtn.disabled = true;
+        findBtn.textContent = "검색 중…";
+        try {
+          const items = await searchBooks(q);
+          renderCoverResults(items);
+        } catch (e) {
+          flash(String(e).includes("aladin:") ? "키를 확인해주세요" : "표지를 찾지 못했어요");
+        } finally {
+          findBtn.disabled = false;
+          findBtn.textContent = "표지 찾기";
+        }
+      };
+
+    function renderCoverResults(items: AladinItem[]) {
+      const box = root.querySelector(".coverres") as HTMLElement | null;
+      if (!box) return; // 화면 이탈 후 늦은 응답 — 무시
+      if (!items.length) {
+        box.innerHTML = `<div class="hint-empty">결과가 없어요</div>`;
+        return;
+      }
+      box.innerHTML = items
+        .map(
+          (it, i) => `
+        <button class="coveropt" data-i="${i}">
+          <img src="${esc(it.cover)}" alt="" loading="lazy" />
+          <span class="coveropt__t">${esc(it.title)}</span>
+          <span class="coveropt__a">${esc(it.author)}</span>
+        </button>`,
+        )
+        .join("");
+      box.querySelectorAll<HTMLButtonElement>(".coveropt").forEach((el) => {
+        el.onclick = async () => {
+          const it = items[Number(el.dataset.i)];
+          try {
+            const { buf, type } = await fetchCover(it.cover);
+            // ISBN 자동 채움: 라이브 폼 필드 기준(레이스 방지), isbn13 빈값 스킵
+            const fillIsbn = !isbnEl.value.trim() && it.isbn13 ? it.isbn13 : null;
+            if (fillIsbn) isbnEl.value = fillIsbn;
+            await putBook({ ...book, cover: buf, coverType: type, ...(fillIsbn ? { isbn: fillIsbn } : {}) });
+            book.cover = buf;
+            book.coverType = type;
+            if (fillIsbn) book.isbn = fillIsbn;
+            flash("표지를 저장했어요");
+            const resBox = root.querySelector(".coverres") as HTMLElement | null;
+            if (resBox) resBox.innerHTML = "";
+          } catch {
+            flash("표지를 가져오지 못했어요"); // 결과 유지 — 재시도
+          }
+        };
+      });
+    }
     (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
       const title = titleEl.value.trim();
       if (!title) {
@@ -186,14 +257,22 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     };
   }
 
-  return () => {};
+  return () => {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+  };
 }
 
-function bookRow(b: Book) {
+function bookRow(b: Book, urls: string[]) {
+  let mini = `<div class="mini cov-1"></div>`;
+  if (b.cover instanceof ArrayBuffer) {
+    const u = URL.createObjectURL(new Blob([b.cover], { type: b.coverType ?? "image/jpeg" }));
+    urls.push(u);
+    mini = `<img class="mini mini--img" src="${u}" alt="" />`;
+  }
   return `
   <div class="item" data-id="${b.uuid}">
     <div class="item__row">
-      <div class="mini cov-1"></div>
+      ${mini}
       <div class="item__body">
         <div class="item__t">${esc(b.title)}</div>
         ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}

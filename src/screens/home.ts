@@ -22,6 +22,7 @@ function startOfDay(ts: number) {
 const coverClass = (i: number) => `cov-${(i % 3) + 1}`;
 
 export function mountHome(root: HTMLElement, nav: Nav): () => void {
+  const urls: string[] = []; // 표지 objectURL — 재렌더/이탈 시 revoke
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   (async () => {
@@ -30,6 +31,8 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
   })();
 
   function render(books: BookView[]) {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+    urls.length = 0;
     const top = books[0] ? topCard(books[0]) : emptyCard();
     const rest = books.slice(1);
 
@@ -38,14 +41,18 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
       <h1 class="home__h">내 책</h1>
       ${top}
       <button class="btn-primary home__start">▶ 독서 시작</button>
-      ${rest.length ? `<div class="sectit">다른 책</div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
+      ${rest.length ? `<div class="sectit">다른 책 <button class="home__books-link">책장 →</button></div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
       ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
-      <button class="home__transfer">백업·가져오기</button>
+      <button class="home__transfer">백업·설정</button>
       <div class="home__ver">build ${__BUILD__}</div>
     </div>`;
 
     const startBtn = root.querySelector(".home__start") as HTMLButtonElement;
     startBtn.onclick = () => nav({ name: "books" });
+
+    // "책장 →" — [data-book] 위임과 분리된 전용 배선
+    const booksLink = root.querySelector(".home__books-link") as HTMLButtonElement | null;
+    if (booksLink) booksLink.onclick = () => nav({ name: "books" });
 
     (root.querySelector(".home__transfer") as HTMLButtonElement).onclick = () =>
       nav({ name: "transfer" });
@@ -84,11 +91,20 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     return `${v.roundNumber}회독${t}`;
   }
 
+  function coverHtml(v: BookView, cls: "cover" | "mini", fallback: string): string {
+    if (v.book.cover instanceof ArrayBuffer) {
+      const u = URL.createObjectURL(new Blob([v.book.cover], { type: v.book.coverType ?? "image/jpeg" }));
+      urls.push(u);
+      return `<img class="${cls} ${cls}--img" src="${u}" alt="" />`;
+    }
+    return fallback;
+  }
+
   function topCard(v: BookView) {
     return `
     <div class="bookcard" data-action data-book="${v.book.uuid}">
       <div class="bookcard__row">
-        <div class="cover cov-1">${esc(v.book.title).slice(0, 6)}</div>
+        ${coverHtml(v, "cover", `<div class="cover cov-1">${esc(v.book.title).slice(0, 6)}</div>`)}
         <div class="bookcard__body">
           <div class="booktitle">${esc(v.book.title)}</div>
           <div class="sessionchip"><span class="dot"></span>${roundLabel(v)} · ${v.captureCount} Captures</div>
@@ -106,7 +122,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     return `
     <div class="item" data-book="${v.book.uuid}">
       <div class="item__row">
-        <div class="mini ${coverClass(i)}"></div>
+        ${coverHtml(v, "mini", `<div class="mini ${coverClass(i)}"></div>`)}
         <div class="item__body">
           <div class="item__t">${esc(v.book.title)}</div>
           <div class="item__s">${roundLabel(v)} · ${v.captureCount} captures</div>
@@ -129,7 +145,10 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     </div>`;
   }
 
-  return () => {};
+  return () => {
+    urls.forEach((u) => URL.revokeObjectURL(u));
+    urls.length = 0;
+  };
 }
 
 function showIosInstallSheet(root: HTMLElement) {

@@ -12,10 +12,13 @@ import type { Book, Capture, Session } from "../db/types.ts";
 interface CaptureBackup extends Omit<Capture, "image"> {
   image: string | null; // dataURL 또는 null
 }
+interface BookBackup extends Omit<Book, "cover"> {
+  cover: string | null; // dataURL 또는 null (ArrayBuffer는 JSON 직렬화 불가)
+}
 interface BackupBundle {
   version: 1;
   exportedAt: number;
-  books: Book[];
+  books: BookBackup[];
   sessions: Session[];
   captures: CaptureBackup[];
 }
@@ -33,7 +36,15 @@ async function dataUrlToBlob(u: string): Promise<Blob> {
 }
 
 export async function buildBackup(now: number): Promise<Blob> {
-  const [books, sessions, caps] = await Promise.all([listBooks(), allSessions(), allCaptures()]);
+  const [rawBooks, sessions, caps] = await Promise.all([listBooks(), allSessions(), allCaptures()]);
+  const books: BookBackup[] = [];
+  for (const b of rawBooks) {
+    const cover =
+      b.cover instanceof ArrayBuffer
+        ? await blobToDataUrl(new Blob([b.cover], { type: b.coverType ?? "image/jpeg" }))
+        : null;
+    books.push({ ...b, cover });
+  }
   const captures: CaptureBackup[] = [];
   for (const c of caps) {
     const { image, ...rest } = c;
@@ -59,7 +70,10 @@ export async function importBackup(text: string): Promise<ImportResult> {
   ) {
     throw new Error("unsupported backup");
   }
-  for (const bk of b.books) await putBook(bk);
+  for (const bk of b.books) {
+    const cover = bk.cover ? await (await dataUrlToBlob(bk.cover)).arrayBuffer() : undefined;
+    await putBook({ ...bk, cover });
+  }
   for (const s of b.sessions) await putSession(s);
   for (const c of b.captures) {
     const { image, ...rest } = c;

@@ -15,7 +15,8 @@ export interface Book {
   title: string; // 필수 — ADR-006
   author?: string;
   isbn?: string;
-  cover?: Blob;
+  cover?: ArrayBuffer | null; // 표지(저장형 ArrayBuffer — ADR-015). instanceof 가드로만 렌더.
+  coverType?: string; // MIME (기본 image/jpeg)
 }
 
 export interface Session {
