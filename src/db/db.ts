@@ -267,14 +267,3 @@ export async function capturesWithRoundsForBook(
   }
   return out;
 }
-
-/** 비활동 자동 종료 — 마지막 활동 후 maxIdleMs 경과한 열린 세션을 닫는다(ADR-005). */
-export async function endStaleSessions(now: number, maxIdleMs = 8 * 60 * 60 * 1000) {
-  const open = (await (await db()).getAll("sessions")).filter((s) => s.ended == null);
-  for (const s of open) {
-    const v = await toView(s);
-    if (now - v.lastActivity > maxIdleMs) {
-      await putSession({ ...s, ended: v.lastActivity });
-    }
-  }
-}
