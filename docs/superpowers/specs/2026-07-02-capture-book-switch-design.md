@@ -22,19 +22,23 @@ export function openBookPicker(
   opts: { currentBookId?: string; onPick: (book: Book) => void },
 ): void;
 ```
-- `listBooks()`(등록순) 또는 `recentBooks(50)`(최근 활동순 — **채택: 최근 활동순이 목적에 부합**, BookView 재사용)로 목록. 행: 표지(mini, `cover instanceof ArrayBuffer` 가드 — objectURL은 시트 닫힐 때 revoke) + 제목 + 회독 배지. 현재 책은 체크 표시·탭 시 그냥 닫기.
-- 기존 시트 스타일(install-sheet/coveropt 톤) 재사용, 스크림 탭/닫기 버튼으로 dismiss. 탭타깃 ≥48px.
-- 시트 내부에서 생성한 objectURL은 dismiss 시 전부 revoke(자체 관리 — 호출 화면과 독립).
+- `recentBooks(50)`(최근 활동순, BookView 재사용)로 목록. 행: 표지(mini, `cover instanceof ArrayBuffer` 가드) + 제목 + 회독 배지. 현재 책은 체크 표시·탭 시 그냥 닫기(no-op).
+- **CSS(검토 4): install-sheet 단순 재사용 불가** — 목록 시트라 `max-height` + `overflow-y: auto` + `-webkit-overflow-scrolling: touch` 필요(.input-panel 패턴 참조). 행 ≥48px. 오버레이는 **document.body에 append**(viewer.ts 방식 — 화면 재렌더에 안 죽게). 스크림 탭/닫기로 dismiss. 참고: 입력모드 배경은 **밝음**(.cam.mode--input) — 밝은 시트가 자연스럽게 어울림(검토 확인).
+- 시트 내 objectURL은 dismiss 시 전부 revoke(자체 관리 — 호출 화면과 독립).
+- **메모리(검토 6, 수용):** recentBooks는 책마다 캡처 전체(이미지 ArrayBuffer 포함)를 순회 — 사진 많은 서재에선 일시적 메모리 비용. 홈이 이미 같은 비용 지불(신규 점근 비용 없음). 후속 개선 아이디어: countCaptures + byCreated 커서 1패스.
 
 ### 2. `src/screens/capture.ts` — 입력모드 책 전환
-- 상단 pill의 책 제목 영역: **입력모드일 때만** 탭 핸들러 → `openBookPicker(root, { currentBookId, onPick })`.
-- `onPick(book)`: `const sid = await currentRoundFor(book.uuid);` → **화면 상태 교체**: `session`(회독)·책 제목 표시 갱신, **입력 필드(inpPassage/노트/페이지/선택 태그) 값은 그대로**. 재마운트(nav) 방식이 아니라 in-place 교체(텍스트 유지가 핵심 요구). 저장 시 새 session.uuid로 addCapture.
-  - 구현 주의: capture.ts가 `session`을 로컬 상태로 들고 있으므로 `session = await getSession(sid)` + 제목 갱신이면 충분한지 확인(카메라는 입력모드라 무관). 사진 모드 전환 시에도 바뀐 세션 유지(모드 토글은 화면 내 상태).
-- pill에 시각적 힌트(작은 ▾) — 입력모드에서만. 사진 모드는 기존 그대로(핸들러 없음).
+- **핸들러 게이팅(검토 1):** 모드는 런타임 토글이므로 mount 시점 분기 금지 — `.pill__title`에 핸들러를 **한 번** 배선하고 내부에서 `if (currentMode !== "input") return;`. (mount 분기 시: photo→input 토글하면 기능 소실 / input→photo 토글하면 사진 모드로 누수.)
+- 검토 확인: 저장(사진/입력)·카운트 칩 네비 모두 이벤트 시점에 `session.uuid`를 읽는 **늦은 바인딩** → 클로저 변수 재할당으로 충분. 교체 후 사진 모드 토글해 찍어도 새 세션 유지.
+- **`onPick(book)`은 3가지 갱신(검토 2):** ① `session = (await getSession(await currentRoundFor(book.uuid)))!` ② `.pill__title` **전체 재렌더**(제목 + `session.project` 칩 — 옛 회독 목적 칩 잔류 방지, esc 필수) ③ `count = await countCaptures(session.uuid)` + `cntEl` 텍스트 갱신(옛 회독 수 잔류 방지). 입력 필드 값은 그대로.
+- **pick 레이스(검토 5):** 시트 dismiss는 위 3가지 갱신 **완료 후에**(교체 중 빠른 저장이 옛 회독으로 가는 창 제거).
+- ▾ 힌트는 **CSS로**: `.cam.mode--input .pill__title::after`(모드 클래스에 자동 연동, JS 불필요). `.pill__title` 탭 히트영역은 입력모드에서 패딩 확대(pill이 ~40px — ≥48px 규칙).
 
 ### 3. `src/screens/detail.ts` — 캡처 책 이동
-- 상세 화면에 현재 책 이름 표시 + **"책 바꾸기"** 액션(기존 편집 UI 톤에 맞게 — 행/버튼) → `openBookPicker` → `onPick`: `const sid = await currentRoundFor(book.uuid); cap.sessionId = sid; cap.updatedAt = Date.now(); await updateCapture(cap);` → 토스트("『제목』(으)로 옮겼어요") + 표시 갱신.
-- detail이 책 제목을 이미 표시하는지 확인 — 없으면 세션→책 로드해 표시(작게).
+- **전제(검토 3): detail은 현재 세션/책 컨텍스트가 전혀 없음**(getCapture만 로드) → `getSession(cap.sessionId)` + `getBook(session.bookId)` 로드 추가(책 이름 표시 + picker의 currentBookId용). import 확장.
+- 현재 책 이름 표시 + **"책 바꾸기"** 액션 → `openBookPicker` → `onPick`: `cap.sessionId = await currentRoundFor(book.uuid); cap.updatedAt = Date.now(); await updateCapture(cap);` → 토스트("『제목』(으)로 옮겼어요") + 표시 갱신. (cap in-place 변이는 기존 저장 스프레드와 정합 — 검토 확인.)
+- **toast div가 detail에 없음** → books.ts/export.ts 패턴(.toast + setTimeout 2400ms)으로 추가.
+- **이동 후 back 동작(명시):** back은 기존 `from`(옛 Review)으로 — 캡처가 거기 없을 수 있음을 **수용**(문서화된 의도). 새 책 Review로 강제 이동하지 않음(단순성).
 
 ## 제약/디자인
 - 사진 모드 3초 루프 불변(핸들러 자체를 입력모드에서만 배선).
@@ -45,5 +49,9 @@ export function openBookPicker(
 ## 검증
 `npm run build` + preview: 입력모드에서 pill 탭→책 전환→텍스트 유지→저장이 새 책 회독으로; 공유 수신 후 책 전환; detail에서 책 바꾸기→Review(새 책)에 캡처 표시; 사진 모드 pill 무반응. `test:pdf` PASS. 실기기 확인.
 
+## 의도된 비동작 (검토 7 — 문서화)
+- **같은 책 pick = 순수 닫기** → 같은 책의 옛 회독 캡처를 현재 회독으로 옮기는 건 범위 밖.
+- **회독 없는 책 pick은 열린 회독을 생성**(currentRoundFor get-or-create — 홈 버튼과 동일 의미론). 저장 안 하면 빈 회독이 남을 수 있음 — 수용(빈 회독은 표시에서 자연 스킵).
+
 ## 범위 밖
-- 사진 모드 책 전환, 다중 캡처 일괄 이동, 이동 취소(undo).
+- 사진 모드 책 전환, 다중 캡처 일괄 이동, 이동 취소(undo), recentBooks 경량화(후속).
