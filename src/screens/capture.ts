@@ -14,6 +14,7 @@ import { addCapture, countCaptures, currentRoundFor, getBook, getSession, uuid }
 import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../db/types.ts";
 import { consumeSharedText } from "../lib/install.ts";
 import { openBookPicker } from "../lib/bookpicker.ts";
+import { openImageViewer } from "../lib/viewer.ts";
 
 type Phase = "live" | "editing";
 type Mode = "photo" | "input";
@@ -312,6 +313,17 @@ export function mountCapture(
       closeEditor(false);
     };
 
+    // 사진 탭 → 전체화면 뷰어(재크롭) — detail.ts와 동일 패턴, 뷰어는 body 부착(z1000, 시트 위)
+    edImg.onclick = () => {
+      if (!pendingPhoto) return;
+      openImageViewer(pendingPhoto.blob, {
+        onCrop: (blob, w, h) => {
+          pendingPhoto = { ...pendingPhoto!, blob, width: w, height: h };
+          setEditorPhoto(blob); // objectURL 교체(이전 revoke)
+        },
+      });
+    };
+
     // ---- Tag rows (공용 헬퍼) ----
     const edTagEls = wireTagRow(root.querySelector(".ed__tagrow") as HTMLElement, (t) => {
       edChosenTag = t;
@@ -324,7 +336,16 @@ export function mountCapture(
 
     // ---- Editor save: 단일 addCapture (ADR-018 — 이중 저장 수렴) ----
     edSave.onclick = async () => {
-      if (phase !== "editing") return;
+      if (phase !== "editing" || edSave.disabled) return;
+      edSave.disabled = true; // 더블탭 가드 — 동기 차단, finally에서 해제
+      try {
+        await doEditorSave();
+      } finally {
+        edSave.disabled = false;
+      }
+    };
+
+    async function doEditorSave() {
       const saveSw = new Stopwatch();
       const { passage, note, page } = readForm({ passage: edPassage, note: edNote, page: edPage });
       const ok = validate(
@@ -369,10 +390,20 @@ export function mountCapture(
       if (hadPhoto) showDone();
       else flash("저장했어요");
       closeEditor(true);
-    };
+    }
 
     // ---- Input mode: save ----
     inpSaveBtn.onclick = async () => {
+      if (inpSaveBtn.disabled) return;
+      inpSaveBtn.disabled = true; // 더블탭 가드 — 동기 차단, finally에서 해제
+      try {
+        await doInputSave();
+      } finally {
+        inpSaveBtn.disabled = false;
+      }
+    };
+
+    async function doInputSave() {
       const { passage, note, page } = readForm({
         passage: inpPassage,
         note: inpNote,
@@ -420,7 +451,7 @@ export function mountCapture(
       inpPassage.focus();
 
       flash("저장했어요");
-    };
+    }
 
     function renderHud(m: { appMs: number; humanMs: number; compressMs: number; sizeKB: number }) {
       const warmup = hud.querySelector(".hud__chip")?.outerHTML ?? "";
@@ -547,7 +578,10 @@ function template(session: Session, bookTitle: string, startCount: number, initi
         <textarea class="field inp__passage" rows="6" placeholder="담고 싶은 글 (선택)"></textarea>
         <label class="inp__label">내 생각 (선택)</label>
         <textarea class="field inp__note" rows="2" placeholder="내 생각·메모 (선택)"></textarea>
-        <input class="field inp__page" type="number" inputmode="numeric" min="1" placeholder="페이지 (선택)" />
+        <div class="pagerow">
+          <label class="inp__label pagerow__l">페이지</label>
+          <input class="field inp__page" type="number" inputmode="numeric" min="1" placeholder="—" />
+        </div>
         <button class="btn-primary inp__save">저장</button>
       </div>
     </div>
@@ -566,7 +600,10 @@ function template(session: Session, bookTitle: string, startCount: number, initi
         <textarea class="field ed__passage" rows="4" placeholder="담고 싶은 글 (선택)"></textarea>
         <label class="inp__label">내 생각</label>
         <textarea class="field ed__note" rows="3" placeholder="내 생각 (선택)"></textarea>
-        <input class="field ed__page" type="number" inputmode="numeric" min="1" placeholder="페이지 (선택)" />
+        <div class="pagerow">
+          <label class="inp__label pagerow__l">페이지</label>
+          <input class="field ed__page" type="number" inputmode="numeric" min="1" placeholder="—" />
+        </div>
         <button class="btn-primary ed__save">저장</button>
       </div>
     </div>

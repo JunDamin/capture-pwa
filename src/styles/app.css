@@ -1428,7 +1428,24 @@
   margin-bottom: 14px;
 }
 
-.inp__page {
+/* 페이지 필드 — 컴팩트 인라인 행(레이블 + 좁은 숫자 입력). 시트·입력 패널 공용 */
+.pagerow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.pagerow__l {
+  margin: 0;
+  flex-shrink: 0;
+}
+.pagerow .field {
+  width: 96px;
+  min-height: 48px;
+  margin-bottom: 0;
+  text-align: center;
+}
+.input-panel .pagerow {
   margin-bottom: 20px;
 }
 
