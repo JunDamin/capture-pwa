@@ -1,4 +1,4 @@
-# 캡처 대상 책 전환 — 입력모드 + 캡처 상세 (spec)
+# 캡처 대상 책 전환 + 생각만 캡처 — 입력모드/상세 (spec)
 
 날짜: 2026-07-02
 관련: ADR-016(책 중심·회독, currentRoundFor), 공유 수신(share_target), ADR-014(캡처 모델)
@@ -48,6 +48,15 @@ export function openBookPicker(
 
 ## 검증
 `npm run build` + preview: 입력모드에서 pill 탭→책 전환→텍스트 유지→저장이 새 책 회독으로; 공유 수신 후 책 전환; detail에서 책 바꾸기→Review(새 책)에 캡처 표시; 사진 모드 pill 무반응. `test:pdf` PASS. 실기기 확인.
+
+### 4. 입력모드 "생각만 캡처" 허용 (추가 요구)
+- **맥락:** 책 전반에 드는 생각을 — 특정 구절(passage)이나 사진 없이 — 기록하고 싶다. 모델(ADR-014 `isValidCapture` = 사진‖담은글‖메모 + 태그)은 이미 허용; **입력모드 UI만 passage를 강제**(capture.ts:306, placeholder "(필수)").
+- **변경(capture.ts 입력모드만):**
+  - 검증: `if (!passageVal) reject` → **`if (!passageVal && !noteVal)`**(둘 다 비면 두 필드 모두 `field--err` + return). 그 아래 기존 `isValidCapture` 검사 유지.
+  - note 입력에도 `oninput` 에러 클리어 추가(passage와 동일 패턴).
+  - placeholder: 담은 글 "(필수)" → **"(선택)"**; note placeholder는 현행 유지(또는 "내 생각 — 이것만 적어도 저장돼요" 톤 확인 후 plain하게).
+  - 파일 헤더 주석 "passage(필수)" → "passage 또는 note ≥1"로 정정.
+- 표시/Export/PDF는 이미 메모-only 캡처를 처리(사진 모드가 원래 메모만 저장 가능) — 변경 없음.
 
 ## 의도된 비동작 (검토 7 — 문서화)
 - **같은 책 pick = 순수 닫기** → 같은 책의 옛 회독 캡처를 현재 회독으로 옮기는 건 범위 밖.
