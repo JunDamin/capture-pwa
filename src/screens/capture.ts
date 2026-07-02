@@ -1,7 +1,7 @@
 /**
  * Capture 루프 — PRD §7-B / §16.
  * 사진 모드: 셔터(동결) → 태그(필수) → 내 생각(선택) → 저장 → 즉시 카메라 복귀.
- * 입력 모드: passage(필수) + note(선택) + page(선택) + 태그(필수) → 저장 → 초기화.
+ * 입력 모드: passage 또는 note ≥1 + page(선택) + 태그(필수) → 저장 → 초기화.
  * 예산 계측: 웜업 / appMs / humanMs / 압축 / 용량 — HUD 노출 (사진 모드만).
  */
 import type { Nav } from "../app.ts";
@@ -74,6 +74,7 @@ export function mountCapture(
     const inpSaveBtn = root.querySelector(".inp__save") as HTMLButtonElement;
     const inpHint = root.querySelector(".inp__hint") as HTMLElement;
     inpPassage.oninput = () => inpPassage.classList.remove("field--err");
+    inpNote.oninput = () => inpNote.classList.remove("field--err");
 
     // 공유 수신 텍스트 — 입력모드 시 passage 프리필(1회성)
     if (initialMode === "input") {
@@ -152,6 +153,7 @@ export function mountCapture(
         inpTagEls.forEach((t) => t.classList.remove("is-sel"));
         inpHint.classList.remove("inp__hint--err");
         inpPassage.classList.remove("field--err");
+        inpNote.classList.remove("field--err");
         await startCam();
       }
     }
@@ -323,10 +325,11 @@ export function mountCapture(
       const passageVal = inpPassage.value.trim() || null;
       const noteVal = inpNote.value.trim() || null;
 
-      // Validate: passage is required in input mode (no image)
-      if (!passageVal) {
+      // Validate: 내용 ≥1 — passage 또는 note 중 하나는 필요 (ADR-014)
+      if (!passageVal && !noteVal) {
         inpPassage.focus();
         inpPassage.classList.add("field--err");
+        inpNote.classList.add("field--err");
         return;
       }
       if (!inpChosenTag) {
@@ -369,9 +372,10 @@ export function mountCapture(
       inpHint.classList.remove("inp__hint--err");
       inpHint.textContent = "한 가지 태그를 고르세요";
       inpPassage.classList.remove("field--err");
+      inpNote.classList.remove("field--err");
       inpPassage.focus();
 
-      showDone();
+      flash("저장했어요");
     };
 
     function renderHud(m: { appMs: number; humanMs: number; compressMs: number; sizeKB: number }) {
@@ -389,6 +393,17 @@ export function mountCapture(
       done.classList.remove("is-show");
       void done.offsetWidth;
       done.classList.add("is-show");
+    }
+
+    // ---- 입력 저장 토스트 (books/export 패턴) — 연속 저장 시 이전 타이머 리셋 ----
+    const toast = root.querySelector(".toast") as HTMLElement;
+    let toastTimer: ReturnType<typeof setTimeout> | undefined;
+    function flash(msg: string) {
+      navigator.vibrate?.(30);
+      toast.textContent = msg;
+      toast.hidden = false;
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => (toast.hidden = true), 3000);
     }
 
     function resetToLive() {
@@ -449,13 +464,13 @@ function template(session: Session, bookTitle: string, startCount: number, initi
 
     <div class="input-panel">
       <div class="input-panel__inner">
+        <div class="inp__hint">한 가지 태그를 고르세요</div>
+        <div class="tagrow inp__tagrow">${tags}</div>
         <label class="inp__label">담고 싶은 글</label>
-        <textarea class="field inp__passage" rows="6" placeholder="담고 싶은 글 (필수)"></textarea>
+        <textarea class="field inp__passage" rows="6" placeholder="담고 싶은 글 (선택)"></textarea>
         <label class="inp__label">내 생각 (선택)</label>
         <textarea class="field inp__note" rows="2" placeholder="내 생각·메모 (선택)"></textarea>
         <input class="field inp__page" type="number" inputmode="numeric" min="1" placeholder="페이지 (선택)" />
-        <div class="inp__hint">한 가지 태그를 고르세요</div>
-        <div class="tagrow inp__tagrow">${tags}</div>
         <button class="btn-primary inp__save">저장</button>
       </div>
     </div>
@@ -471,6 +486,7 @@ function template(session: Session, bookTitle: string, startCount: number, initi
     </div>
 
     <div class="done"><div class="done__badge">✓</div></div>
+    <div class="toast" hidden></div>
   </div>`;
 }
 

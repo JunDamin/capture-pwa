@@ -965,6 +965,7 @@
   border-radius: 12px;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   z-index: 20;
+  pointer-events: none; /* 비대화형 — 저장 버튼 등 아래 UI 탭 통과 */
 }
 
 /* 카메라 pill 내 버튼 (홈/리뷰) */
@@ -1533,7 +1534,8 @@
 .cropframe__grid .cf-v2 { left: 66.67%; top: 0; bottom: 0; width: 1px; }
 .cropframe__grid .cf-h1 { top: 33.33%; left: 0; right: 0; height: 1px; }
 .cropframe__grid .cf-h2 { top: 66.67%; left: 0; right: 0; height: 1px; }
-.cam.is-frozen .cropframe { display: none; }
+/* 동결(is-frozen) 중에도 크롭 프레임 유지 — 무엇이 저장될지 보여준다.
+   동결 중 프레임 조정도 저장에 반영됨(저장이 getRect()를 저장 시점에 읽음 — 의도). */
 
 /* 책 선택 바텀시트 (bookpicker) */
 .bookpick { position: fixed; inset: 0; z-index: 60; background: rgba(25,31,40,0.4); display: grid; place-items: end center; padding: 16px; }
