@@ -19,7 +19,7 @@ export default defineConfig({
     VitePWA({
       registerType: "autoUpdate",
       injectRegister: "auto",
-      includeAssets: ["icon.svg"],
+      includeAssets: ["icon.svg", "apple-touch-icon-180.png", "icon-192.png", "icon-512.png", "icon-maskable-512.png"],
       manifest: {
         name: "Capture",
         short_name: "Capture",
@@ -31,13 +31,21 @@ export default defineConfig({
         background_color: "#FFFFFF",
         theme_color: "#3182F6",
         icons: [
+          { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
+          { src: "icon-maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
           { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "any" },
-          { src: "icon.svg", sizes: "any", type: "image/svg+xml", purpose: "maskable" },
         ],
+        share_target: {
+          action: "./",
+          method: "GET",
+          params: { title: "shared_title", text: "shared_text", url: "shared_url" },
+        },
       },
       workbox: {
-        globPatterns: ["**/*.{js,css,html,svg,woff2}"],
+        globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],
         navigateFallback: null,
+        ignoreURLParametersMatching: [/^utm_/, /^shared_/],
       },
     }),
   ],

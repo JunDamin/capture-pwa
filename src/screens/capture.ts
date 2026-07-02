@@ -11,6 +11,7 @@ import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
 import { addCapture, countCaptures, getBook, getSession, uuid } from "../db/db.ts";
 import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../db/types.ts";
+import { consumeSharedText } from "../lib/install.ts";
 
 type Phase = "live" | "tagging" | "note";
 type Mode = "photo" | "input";
@@ -72,6 +73,12 @@ export function mountCapture(
     const inpSaveBtn = root.querySelector(".inp__save") as HTMLButtonElement;
     const inpHint = root.querySelector(".inp__hint") as HTMLElement;
     inpPassage.oninput = () => inpPassage.classList.remove("field--err");
+
+    // 공유 수신 텍스트 — 입력모드 시 passage 프리필(1회성)
+    if (initialMode === "input") {
+      const shared = consumeSharedText();
+      if (shared) inpPassage.value = shared;
+    }
 
     (root.querySelector(".cam__back") as HTMLElement).onclick = () => nav({ name: "home" });
     cntEl.onclick = () => nav({ name: "review", scope: "session", id: session.uuid });
@@ -153,6 +160,7 @@ export function mountCapture(
 
     // ---- Initial camera startup (photo mode only) ----
     if (initialMode === "photo") {
+      consumeSharedText(); // 잔류 클리어 — 사진 모드 진입 시 버림
       startCam();
     }
 

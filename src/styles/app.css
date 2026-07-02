@@ -1390,6 +1390,23 @@
   font-variant-numeric: tabular-nums;
 }
 
+/* ---- 앱 설치 버튼 + iOS 안내 시트 ---- */
+.home__install {
+  display: block; width: 100%; min-height: 44px; margin-top: 8px;
+  background: none; border: none; color: var(--sub); font-size: 14px;
+  text-decoration: underline; text-underline-offset: 3px; cursor: pointer;
+}
+.install-sheet {
+  position: fixed; inset: 0; z-index: 50; background: rgba(25,31,40,0.4);
+  display: grid; place-items: end center; padding: 16px;
+}
+.install-sheet__card {
+  background: #fff; border-radius: 20px; padding: 24px 20px; width: 100%; max-width: 420px;
+  text-align: center;
+}
+.install-sheet__t { font-weight: 700; font-size: 18px; color: var(--ink); margin-bottom: 8px; }
+.install-sheet__s { color: var(--sub); font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+
 /* ---- 크롭 프레임 오버레이 (라이브 카메라 위) ---- */
 .cropframe { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .cropframe__mask { position: absolute; background: rgba(0,0,0,0.28); pointer-events: none; }
