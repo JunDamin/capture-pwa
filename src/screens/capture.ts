@@ -1,8 +1,9 @@
 /**
- * Capture 루프 — PRD §7-B / §16.
- * 사진 모드: 셔터(동결) → 태그(필수) → 내 생각(선택) → 저장 → 즉시 카메라 복귀.
+ * Capture 루프 — PRD §7-B / §16, ADR-018.
+ * 사진 모드: 셔터(크롭·압축 킥오프, 스냅샷 의미론) → 편집 시트 상승(사진 확인·다시 찍기·태그·담은 글·생각·페이지)
+ *   → 저장(단일 addCapture) → 시트 하강, 라이브 복귀. 카메라는 시트 아래에서 계속 라이브.
  * 입력 모드: passage 또는 note ≥1 + page(선택) + 태그(필수) → 저장 → 초기화.
- * 예산 계측: 웜업 / appMs / humanMs / 압축 / 용량 — HUD 노출 (사진 모드만).
+ * 예산 계측: 웜업 / appMs(shutterMs+saveMs) / humanMs / 압축 / 용량 — HUD 노출 (사진 모드만).
  */
 import type { Nav } from "../app.ts";
 import { startCamera, stopCamera } from "../camera/camera.ts";
@@ -14,8 +15,15 @@ import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../d
 import { consumeSharedText } from "../lib/install.ts";
 import { openBookPicker } from "../lib/bookpicker.ts";
 
-type Phase = "live" | "tagging" | "note";
+type Phase = "live" | "editing";
 type Mode = "photo" | "input";
+
+interface PendingPhoto {
+  blob: Blob;
+  width: number;
+  height: number;
+  compressMs: number;
+}
 
 export function mountCapture(
   root: HTMLElement,
@@ -26,7 +34,7 @@ export function mountCapture(
   root.innerHTML = `<div class="cam"><div class="cam__boot">준비 중…</div></div>`;
 
   let cropFrame: CropFrame | null = null;
-  let freezeCanvas: HTMLCanvasElement | null = null;
+  let pendingUrl: string | null = null; // 편집 시트 사진 objectURL — cleanup에서도 revoke
 
   (async () => {
     const session = await getSession(sessionId);
@@ -53,26 +61,29 @@ export function mountCapture(
 
     // ---- Photo mode elements ----
     const video = root.querySelector(".cam__video") as HTMLVideoElement;
-    const freeze = root.querySelector(".cam__freeze") as HTMLImageElement;
     const hint = root.querySelector(".hint") as HTMLElement;
     const shutter = root.querySelector(".shutter") as HTMLButtonElement;
-    const photoCtrl = root.querySelector(".photo-ctrl") as HTMLElement;
-    const tagEls = Array.from(photoCtrl.querySelectorAll(".tag")) as HTMLElement[];
-    const scrim = root.querySelector(".sheet-scrim") as HTMLElement;
-    const sheet = root.querySelector(".sheet") as HTMLElement;
-    const sheetTag = root.querySelector(".sheet__tag") as HTMLElement;
-    const free = root.querySelector(".sheet__free") as HTMLTextAreaElement;
-    const pageInput = root.querySelector(".sheet__page") as HTMLInputElement;
-    const saveBtn = root.querySelector(".btn-save") as HTMLButtonElement;
     const hud = root.querySelector(".hud") as HTMLElement;
+
+    // ---- Editor sheet elements (촬영 후 편집 시트) ----
+    const edsheet = root.querySelector(".edsheet") as HTMLElement;
+    const edImg = root.querySelector(".ed__photoimg") as HTMLImageElement;
+    const edPh = root.querySelector(".ed__photoph") as HTMLElement;
+    const edRetake = root.querySelector(".ed__retake") as HTMLButtonElement;
+    const edHint = root.querySelector(".ed__hint") as HTMLElement;
+    const edPassage = root.querySelector(".ed__passage") as HTMLTextAreaElement;
+    const edNote = root.querySelector(".ed__note") as HTMLTextAreaElement;
+    const edPage = root.querySelector(".ed__page") as HTMLInputElement;
+    const edSave = root.querySelector(".ed__save") as HTMLButtonElement;
+    edPassage.oninput = () => edPassage.classList.remove("field--err");
+    edNote.oninput = () => edNote.classList.remove("field--err");
 
     // ---- Input mode elements ----
     const inpPassage = root.querySelector(".inp__passage") as HTMLTextAreaElement;
     const inpNote = root.querySelector(".inp__note") as HTMLTextAreaElement;
     const inpPage = root.querySelector(".inp__page") as HTMLInputElement;
-    const inpTagEls = Array.from(root.querySelectorAll(".inp__tagrow .tag")) as HTMLElement[];
     const inpSaveBtn = root.querySelector(".inp__save") as HTMLButtonElement;
-    const inpHint = root.querySelector(".inp__hint") as HTMLElement;
+    const inpHint = root.querySelector(".inp__hint:not(.ed__hint)") as HTMLElement;
     inpPassage.oninput = () => inpPassage.classList.remove("field--err");
     inpNote.oninput = () => inpNote.classList.remove("field--err");
 
@@ -82,15 +93,22 @@ export function mountCapture(
       if (shared) inpPassage.value = shared;
     }
 
-    (root.querySelector(".cam__back") as HTMLElement).onclick = () => nav({ name: "home" });
-    cntEl.onclick = () => nav({ name: "review", scope: "session", id: session.uuid });
+    (root.querySelector(".cam__back") as HTMLElement).onclick = () => {
+      if (phase === "editing") return; // 시트 열림 중 상단 틈 탭 차단
+      nav({ name: "home" });
+    };
+    cntEl.onclick = () => {
+      if (phase === "editing") return;
+      nav({ name: "review", scope: "session", id: session.uuid });
+    };
 
     // ---- Photo mode state ----
     let phase: Phase = "live";
-    let freezeUrl: string | null = null;
-    let chosenTag: Tag | null = null;
     let count = startCount;
     let shutterMs = 0;
+    let shotSeq = 0; // 다시 찍기/초기화 이후 늦게 도착한 압축 결과 폐기용
+    let pendingPhoto: PendingPhoto | null = null;
+    let edChosenTag: Tag | null = null;
     const captureSw = new Stopwatch();
 
     // ---- Input mode state ----
@@ -137,8 +155,6 @@ export function mountCapture(
         cam.classList.add("mode--input");
         modeBtnPhoto.classList.remove("is-active");
         modeBtnInput.classList.add("is-active");
-        // Reset photo state if mid-capture
-        if (phase !== "live") resetToLive();
         inpPassage.focus();
       } else {
         // Switch to photo mode: start camera
@@ -158,8 +174,14 @@ export function mountCapture(
       }
     }
 
-    modeBtnPhoto.onclick = () => setMode("photo");
-    modeBtnInput.onclick = () => setMode("input");
+    modeBtnPhoto.onclick = () => {
+      if (phase === "editing") return;
+      setMode("photo");
+    };
+    modeBtnInput.onclick = () => {
+      if (phase === "editing") return;
+      setMode("input");
+    };
 
     // ---- 책 전환 (pill 탭) — 입력 모드에서만 동작(런타임 가드) ----
     const pillTitle = root.querySelector(".pill__title") as HTMLElement;
@@ -187,158 +209,182 @@ export function mountCapture(
       startCam();
     }
 
-    // ---- Shutter: freeze frame + capture stopwatch start ----
-    shutter.onclick = async () => {
+    // ---- 셔터 시점 cover 매핑 — 뷰파인더 좌표 → 소스 픽셀 (스냅샷 의미론, ADR-018) ----
+    function computeCropPx(canvas: HTMLCanvasElement) {
+      const vW = canvas.width;
+      const vH = canvas.height;
+      const elW = cam.clientWidth || vW;
+      const elH = cam.clientHeight || vH;
+      const r = cropFrame ? cropFrame.getRect() : { x: 0, y: 0, w: 1, h: 1 };
+      if (vW > 0 && vH > 0) {
+        const scale = Math.max(elW / vW, elH / vH);
+        const offX = (vW * scale - elW) / 2;
+        const offY = (vH * scale - elH) / 2;
+        return {
+          sx: (r.x * elW + offX) / scale,
+          sy: (r.y * elH + offY) / scale,
+          sw: (r.w * elW) / scale,
+          sh: (r.h * elH) / scale,
+        };
+      }
+      return { sx: 0, sy: 0, sw: vW, sh: vH };
+    }
+
+    // ---- Shutter: 크롭·압축 킥오프 + 편집 시트 상승 ----
+    shutter.onclick = () => {
       if (phase !== "live") return;
       captureSw.reset();
       const shutterSw = new Stopwatch();
+      // 1) 소스 캔버스 + 셔터 시점 크롭 확정(동기)
       const canvas = document.createElement("canvas");
       canvas.width = video.videoWidth;
       canvas.height = video.videoHeight;
       canvas.getContext("2d")?.drawImage(video, 0, 0);
-      freezeCanvas = canvas;
-      canvas.toBlob(
-        (b) => {
-          if (b) {
-            freezeUrl = URL.createObjectURL(b);
-            freeze.src = freezeUrl;
-          }
-          shutterMs = shutterSw.stop();
-        },
-        "image/jpeg",
-        0.6,
-      );
-
-      cam.classList.add("is-frozen");
-      phase = "tagging";
-      hint.textContent = "한 가지 태그를 고르세요";
+      const cropPx = computeCropPx(canvas);
+      // 2) 압축 킥오프(비동기 — 시트 상승 애니메이션과 병행)
+      const seq = ++shotSeq;
+      const compSw = new Stopwatch();
+      void cropResizeCompress(canvas, canvas.width, canvas.height, cropPx)
+        .then(({ blob, width, height }) => {
+          canvas.width = 0;
+          canvas.height = 0; // iOS 캔버스 메모리 즉시 해제(CLAUDE.md)
+          if (seq !== shotSeq) return; // 다시 찍기/저장 뒤 늦게 도착 — 폐기
+          pendingPhoto = { blob, width, height, compressMs: compSw.stop() };
+          if (phase === "editing") setEditorPhoto(blob); // 늦게 도착해도 시트에 반영
+        })
+        .catch(() => {
+          canvas.width = 0;
+          canvas.height = 0; // 무사진 강등 — placeholder 유지, 검증은 저장 시 pendingPhoto 기준
+        });
+      // 3) 시트 상승(동기)
+      openEditor();
+      shutterMs = shutterSw.stop(); // 셔터 탭 → 시트 상승 시작까지(동기 구간)
     };
 
-    // ---- Photo mode: tag selection → note sheet ----
-    tagEls.forEach((el) => {
-      el.onclick = () => {
-        if (phase !== "tagging") return;
-        chosenTag = el.dataset.tag as Tag;
-        tagEls.forEach((t) => t.classList.toggle("is-sel", t === el));
-        const meta = TAGS.find((t) => t.key === chosenTag)!;
-        sheetTag.textContent = `${meta.emoji} ${meta.label}`;
-        openSheet();
-      };
+    // ---- Editor sheet: photo / open / close ----
+    function setEditorPhoto(blob: Blob) {
+      if (pendingUrl) URL.revokeObjectURL(pendingUrl);
+      pendingUrl = URL.createObjectURL(blob);
+      edImg.src = pendingUrl;
+      edImg.hidden = false;
+      edPh.hidden = true;
+    }
+
+    function clearEditorPhoto() {
+      shotSeq += 1; // 진행 중 압축 결과 무효화
+      pendingPhoto = null;
+      if (pendingUrl) {
+        URL.revokeObjectURL(pendingUrl);
+        pendingUrl = null;
+      }
+      edImg.hidden = true;
+      edImg.removeAttribute("src");
+      edPh.hidden = false;
+    }
+
+    function openEditor() {
+      phase = "editing";
+      cam.classList.add("is-editing");
+      edsheet.classList.add("is-open");
+    }
+
+    function closeEditor(reset: boolean) {
+      edsheet.classList.remove("is-open");
+      cam.classList.remove("is-editing");
+      phase = "live";
+      if (reset) {
+        edPassage.value = "";
+        edNote.value = "";
+        edPage.value = "";
+        edChosenTag = null;
+        edTagEls.forEach((t) => t.classList.remove("is-sel"));
+        edHint.classList.remove("inp__hint--err");
+        edHint.textContent = "한 가지 태그를 고르세요";
+        edPassage.classList.remove("field--err");
+        edNote.classList.remove("field--err");
+        clearEditorPhoto();
+      }
+    }
+
+    // 다시 찍기 = 사진만 폐기 — 입력 텍스트·태그는 보존(다음 셔터에서 시트 재개)
+    edRetake.onclick = () => {
+      clearEditorPhoto();
+      closeEditor(false);
+    };
+
+    // ---- Tag rows (공용 헬퍼) ----
+    const edTagEls = wireTagRow(root.querySelector(".ed__tagrow") as HTMLElement, (t) => {
+      edChosenTag = t;
+      edHint.classList.remove("inp__hint--err");
+    });
+    const inpTagEls = wireTagRow(root.querySelector(".inp__tagrow") as HTMLElement, (t) => {
+      inpChosenTag = t;
+      inpHint.classList.remove("inp__hint--err");
     });
 
-    function openSheet() {
-      phase = "note";
-      scrim.classList.add("is-open");
-      sheet.classList.add("is-open");
-    }
-    function closeSheet() {
-      scrim.classList.remove("is-open");
-      sheet.classList.remove("is-open");
-    }
-
-    scrim.onclick = closeSheet;
-
-    // ---- Photo mode: save ----
-    saveBtn.onclick = async () => {
-      if (!chosenTag) return;
+    // ---- Editor save: 단일 addCapture (ADR-018 — 이중 저장 수렴) ----
+    edSave.onclick = async () => {
+      if (phase !== "editing") return;
       const saveSw = new Stopwatch();
-      const memoVal = free.value.trim() || null;
+      const { passage, note, page } = readForm({ passage: edPassage, note: edNote, page: edPage });
+      const ok = validate(
+        { hasPhoto: !!pendingPhoto, passage, note, tag: edChosenTag },
+        { passage: edPassage, note: edNote, hint: edHint },
+      );
+      if (!ok) return;
 
       const rec: Capture = {
         uuid: uuid(),
         sessionId: session.uuid,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        image: null,
-        passage: null,
-        memo: memoVal,
-        tag: chosenTag,
+        image: pendingPhoto?.blob ?? null,
+        passage,
+        memo: note,
+        tag: edChosenTag!,
         why: null,
         ocr: null,
         exportStatus: "none",
       };
+      if (pendingPhoto) {
+        rec.imageW = pendingPhoto.width;
+        rec.imageH = pendingPhoto.height;
+      }
+      if (page) rec.page = page;
 
-      const pageNum = parseInt(pageInput.value, 10);
-      if (Number.isFinite(pageNum) && pageNum > 0) rec.page = pageNum;
+      const hadPhoto = !!pendingPhoto;
+      const compressMs = pendingPhoto?.compressMs ?? 0;
+      const sizeKB = pendingPhoto ? pendingPhoto.blob.size / 1024 : 0;
 
-      if (!freezeCanvas && !memoVal) return;
-      // 캔버스 ref를 먼저 캡처 — resetToLive()가 freezeCanvas를 null로 초기화하기 전에
-      const pendingCanvas = freezeCanvas;
       await addCapture(rec);
       const captureMs = captureSw.stop();
       count += 1;
       cntEl.textContent = `📍 ${count} ›`;
 
-      closeSheet();
-      showDone();
-      resetToLive(); // freezeCanvas = null 포함
-
       const appMs = shutterMs + saveSw.stop();
       const humanMs = Math.max(0, captureMs - appMs);
-
-      let compressMs = 0;
-      let sizeKB = 0;
-      if (pendingCanvas) {
-        const vW = pendingCanvas.width, vH = pendingCanvas.height;
-        const elW = cam.clientWidth || vW, elH = cam.clientHeight || vH;
-        const r = cropFrame ? cropFrame.getRect() : { x: 0, y: 0, w: 1, h: 1 };
-        let cropPx: { sx: number; sy: number; sw: number; sh: number };
-        if (vW > 0 && vH > 0) {
-          const scale = Math.max(elW / vW, elH / vH);
-          const offX = (vW * scale - elW) / 2, offY = (vH * scale - elH) / 2;
-          cropPx = { sx: (r.x * elW + offX) / scale, sy: (r.y * elH + offY) / scale, sw: (r.w * elW) / scale, sh: (r.h * elH) / scale };
-        } else {
-          cropPx = { sx: 0, sy: 0, sw: vW, sh: vH };
-        }
-        const compSw = new Stopwatch();
-        try {
-          const { blob, width, height } = await cropResizeCompress(pendingCanvas, vW, vH, cropPx);
-          compressMs = compSw.stop();
-          sizeKB = blob.size / 1024;
-          rec.image = blob;
-          rec.imageW = width;
-          rec.imageH = height;
-          rec.updatedAt = Date.now();
-          await addCapture(rec);
-        } catch {
-          /* 이미지 실패해도 메타 캡처는 유효 */
-        }
-        pendingCanvas.width = 0;
-        pendingCanvas.height = 0; // iOS 캔버스 메모리 즉시 해제(CLAUDE.md)
-      }
-
       record({ captureMs, appMs, humanMs, compressMs, sizeKB });
       renderHud({ appMs, humanMs, compressMs, sizeKB });
-    };
 
-    // ---- Input mode: tag selection ----
-    inpTagEls.forEach((el) => {
-      el.onclick = () => {
-        inpChosenTag = el.dataset.tag as Tag;
-        inpTagEls.forEach((t) => t.classList.toggle("is-sel", t === el));
-        inpHint.classList.remove("inp__hint--err");
-      };
-    });
+      if (hadPhoto) showDone();
+      else flash("저장했어요");
+      closeEditor(true);
+    };
 
     // ---- Input mode: save ----
     inpSaveBtn.onclick = async () => {
-      const passageVal = inpPassage.value.trim() || null;
-      const noteVal = inpNote.value.trim() || null;
-
-      // Validate: 내용 ≥1 — passage 또는 note 중 하나는 필요 (ADR-014)
-      if (!passageVal && !noteVal) {
-        inpPassage.focus();
-        inpPassage.classList.add("field--err");
-        inpNote.classList.add("field--err");
-        return;
-      }
-      if (!inpChosenTag) {
-        inpHint.classList.add("inp__hint--err");
-        inpHint.textContent = "태그를 골라야 저장할 수 있어요";
-        return;
-      }
+      const { passage, note, page } = readForm({
+        passage: inpPassage,
+        note: inpNote,
+        page: inpPage,
+      });
+      const ok = validate(
+        { hasPhoto: false, passage, note, tag: inpChosenTag },
+        { passage: inpPassage, note: inpNote, hint: inpHint },
+      );
+      if (!ok) return;
       // Sanity check via domain validator
-      if (!isValidCapture({ image: null, passage: passageVal, memo: noteVal, tag: inpChosenTag })) {
+      if (!isValidCapture({ image: null, passage, memo: note, tag: inpChosenTag! })) {
         return;
       }
 
@@ -348,16 +394,14 @@ export function mountCapture(
         createdAt: Date.now(),
         updatedAt: Date.now(),
         image: null,
-        passage: passageVal,
-        memo: noteVal,
-        tag: inpChosenTag,
+        passage,
+        memo: note,
+        tag: inpChosenTag!,
         why: null,
         ocr: null,
         exportStatus: "none",
       };
-
-      const pageNum = parseInt(inpPage.value, 10);
-      if (Number.isFinite(pageNum) && pageNum > 0) rec.page = pageNum;
+      if (page) rec.page = page;
 
       await addCapture(rec);
       count += 1;
@@ -395,7 +439,7 @@ export function mountCapture(
       done.classList.add("is-show");
     }
 
-    // ---- 입력 저장 토스트 (books/export 패턴) — 연속 저장 시 이전 타이머 리셋 ----
+    // ---- 저장 토스트 (books/export 패턴) — 연속 저장 시 이전 타이머 리셋 ----
     const toast = root.querySelector(".toast") as HTMLElement;
     let toastTimer: ReturnType<typeof setTimeout> | undefined;
     function flash(msg: string) {
@@ -405,21 +449,6 @@ export function mountCapture(
       clearTimeout(toastTimer);
       toastTimer = setTimeout(() => (toast.hidden = true), 3000);
     }
-
-    function resetToLive() {
-      phase = "live";
-      chosenTag = null;
-      cam.classList.remove("is-frozen");
-      tagEls.forEach((t) => t.classList.remove("is-sel"));
-      free.value = "";
-      pageInput.value = "";
-      hint.textContent = "책 페이지를 담고 셔터를 누르세요";
-      if (freezeUrl) {
-        URL.revokeObjectURL(freezeUrl);
-        freezeUrl = null;
-      }
-      freezeCanvas = null;
-    }
   }
 
   // Cleanup: always stop camera (safe even if camera was never started)
@@ -427,7 +456,57 @@ export function mountCapture(
     stopCamera();
     cropFrame?.destroy();
     cropFrame = null;
+    if (pendingUrl) {
+      URL.revokeObjectURL(pendingUrl);
+      pendingUrl = null;
+    }
   };
+}
+
+// ---- 공용 폼 헬퍼 — 편집 시트 + 입력 패널이 공유 ----
+
+/** .tag 클릭 → is-sel 단일 토글 + onPick. 행의 tag 엘리먼트 목록을 반환(리셋용). */
+function wireTagRow(rowEl: HTMLElement, onPick: (t: Tag) => void): HTMLElement[] {
+  const els = Array.from(rowEl.querySelectorAll(".tag")) as HTMLElement[];
+  els.forEach((el) => {
+    el.onclick = () => {
+      els.forEach((t) => t.classList.toggle("is-sel", t === el));
+      onPick(el.dataset.tag as Tag);
+    };
+  });
+  return els;
+}
+
+/** trim된 passage/note + 유효 page 번호를 읽는다. */
+function readForm(els: {
+  passage: HTMLTextAreaElement;
+  note: HTMLTextAreaElement;
+  page: HTMLInputElement;
+}): { passage: string | null; note: string | null; page: number | undefined } {
+  const passage = els.passage.value.trim() || null;
+  const note = els.note.value.trim() || null;
+  const pageNum = parseInt(els.page.value, 10);
+  const page = Number.isFinite(pageNum) && pageNum > 0 ? pageNum : undefined;
+  return { passage, note, page };
+}
+
+/** 검증: 사진 있으면 태그만 필수, 무사진이면 (passage ‖ note) + 태그 (ADR-014). */
+function validate(
+  v: { hasPhoto: boolean; passage: string | null; note: string | null; tag: Tag | null },
+  els: { passage: HTMLTextAreaElement; note: HTMLTextAreaElement; hint: HTMLElement },
+): boolean {
+  if (!v.hasPhoto && !v.passage && !v.note) {
+    els.passage.focus();
+    els.passage.classList.add("field--err");
+    els.note.classList.add("field--err");
+    return false;
+  }
+  if (!v.tag) {
+    els.hint.classList.add("inp__hint--err");
+    els.hint.textContent = "태그를 골라야 저장할 수 있어요";
+    return false;
+  }
+  return true;
 }
 
 function template(session: Session, bookTitle: string, startCount: number, initialMode: Mode) {
@@ -441,7 +520,6 @@ function template(session: Session, bookTitle: string, startCount: number, initi
   return `
   <div class="cam${isInput ? " mode--input" : ""}">
     <video class="cam__video" playsinline muted></video>
-    <img class="cam__freeze" alt="" />
     <div class="cam__scrim"></div>
 
     <div class="pill">
@@ -458,14 +536,13 @@ function template(session: Session, bookTitle: string, startCount: number, initi
 
     <div class="photo-ctrl bottom">
       <div class="hint">카메라 준비 중…</div>
-      <div class="tagrow">${tags}</div>
       <div class="shutter-wrap"><button class="shutter" aria-label="촬영"></button></div>
     </div>
 
     <div class="input-panel">
       <div class="input-panel__inner">
         <div class="inp__hint">한 가지 태그를 고르세요</div>
-        <div class="tagrow inp__tagrow">${tags}</div>
+        <div class="tagrow tagrow--light inp__tagrow">${tags}</div>
         <label class="inp__label">담고 싶은 글</label>
         <textarea class="field inp__passage" rows="6" placeholder="담고 싶은 글 (선택)"></textarea>
         <label class="inp__label">내 생각 (선택)</label>
@@ -475,14 +552,23 @@ function template(session: Session, bookTitle: string, startCount: number, initi
       </div>
     </div>
 
-    <div class="sheet-scrim"></div>
-    <div class="sheet">
+    <div class="edsheet">
       <div class="grab"></div>
-      <div class="sheet__tag">⭐ 중요하다</div>
-      <h2>내 생각 (선택)</h2>
-      <textarea class="sheet__free" rows="2" placeholder="내 생각·메모 (선택)"></textarea>
-      <input class="sheet__page" type="number" inputmode="numeric" min="1" placeholder="페이지(선택)" />
-      <button class="btn-primary btn-save">저장</button>
+      <div class="edsheet__scroll">
+        <div class="ed__photo">
+          <img class="ed__photoimg" alt="" hidden />
+          <div class="ed__photoph">📷</div>
+          <button class="btn-ghost ed__retake">다시 찍기</button>
+        </div>
+        <div class="inp__hint ed__hint">한 가지 태그를 고르세요</div>
+        <div class="tagrow tagrow--light ed__tagrow">${tags}</div>
+        <label class="inp__label">담은 글</label>
+        <textarea class="field ed__passage" rows="4" placeholder="담고 싶은 글 (선택)"></textarea>
+        <label class="inp__label">내 생각</label>
+        <textarea class="field ed__note" rows="3" placeholder="내 생각 (선택)"></textarea>
+        <input class="field ed__page" type="number" inputmode="numeric" min="1" placeholder="페이지 (선택)" />
+        <button class="btn-primary ed__save">저장</button>
+      </div>
     </div>
 
     <div class="done"><div class="done__badge">✓</div></div>

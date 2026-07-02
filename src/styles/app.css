@@ -14,21 +14,13 @@
   display: flex;
   flex-direction: column;
 }
-.cam__video,
-.cam__freeze {
+.cam__video {
   position: absolute;
   inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
   z-index: 0;
-}
-.cam__freeze {
-  z-index: 1;
-  display: none;
-}
-.cam.is-frozen .cam__freeze {
-  display: block;
 }
 /* 입력 모드에서 크롭 프레임 숨김 */
 .cam.mode--input .cropframe { display: none; }
@@ -131,15 +123,6 @@
   color: rgba(255, 255, 255, 0.82);
   line-height: 1;
 }
-.cam:not(.is-frozen) .photo-ctrl .tagrow {
-  opacity: 0.4;
-  pointer-events: none;
-}
-/* 사진 모드: 선택된 태그 라벨이 흰 배경에서 보이도록 */
-.photo-ctrl .tag.is-sel .tag__l {
-  color: var(--ink);
-}
-
 .shutter-wrap {
   display: flex;
   justify-content: center;
@@ -156,70 +139,91 @@
 .shutter:active {
   transform: scale(0.9);
 }
-.cam.is-frozen .shutter-wrap {
-  display: none;
-}
 
-/* ---- Why 바텀시트 ---- */
-.sheet-scrim {
-  position: absolute;
-  inset: 0;
-  z-index: 4;
-  background: rgba(0, 0, 0, 0.35);
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
-}
-.sheet-scrim.is-open {
-  opacity: 1;
-  pointer-events: auto;
-}
-.sheet {
+/* ---- 촬영 후 편집 시트 (ADR-018) ---- */
+.edsheet {
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
+  height: 90%;
   z-index: 5;
+  display: flex;
+  flex-direction: column;
   background: #fff;
   color: var(--ink);
   border-radius: 24px 24px 0 0;
-  padding: 10px 22px calc(var(--safe-bottom) + 22px);
+  padding-top: 10px;
   transform: translateY(100%);
   transition: transform 0.32s var(--spring);
 }
-.sheet.is-open {
+.edsheet.is-open {
   transform: translateY(0);
 }
+.edsheet__scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 20px calc(var(--safe-bottom) + 32px);
+}
+.edsheet .field {
+  background: var(--surface); /* 시트 배경이 흰색 — 필드 구분 */
+}
+.ed__photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.ed__photoimg {
+  max-width: 100%;
+  max-height: 30vh;
+  object-fit: contain;
+  border-radius: 12px;
+}
+.ed__photoph {
+  width: 100%;
+  height: 110px;
+  border-radius: 12px;
+  background: var(--surface);
+  color: #b0b8c1;
+  font-size: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ed__photoph[hidden] {
+  display: none;
+}
+.ed__retake {
+  flex: none;
+  min-height: 44px;
+  padding: 0 18px;
+}
+.ed__save {
+  margin-top: 4px;
+  min-height: 52px;
+}
+
+/* 시트 열림 중 — 상단 틈 요소 차단 + HUD 숨김 */
+.cam.is-editing .pill {
+  pointer-events: none;
+}
+.cam.is-editing .cropframe {
+  pointer-events: none;
+}
+.cam.is-editing .hud {
+  display: none;
+}
+
 .grab {
   width: 38px;
   height: 5px;
   border-radius: 3px;
   background: #e5e8eb;
   margin: 0 auto 18px;
-}
-.sheet__tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  background: #fff6e6;
-  color: #c77f00;
-  border-radius: 999px;
-  padding: 7px 13px;
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 18px;
-}
-.sheet h2 {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-  margin-bottom: 4px;
-}
-.sheet__cap {
-  font-size: 14px;
-  color: var(--sub);
-  font-weight: 500;
-  margin-bottom: 20px;
 }
 .chips {
   display: flex;
@@ -245,17 +249,6 @@
 }
 .chip.chip--write {
   color: var(--sub);
-}
-.sheet__free {
-  width: 100%;
-  border: none;
-  background: var(--surface);
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 15px;
-  font-family: inherit;
-  margin-bottom: 14px;
-  resize: none;
 }
 .btn-primary {
   width: 100%;
@@ -1076,11 +1069,6 @@
   width: min(100% - 40px, 600px);
 }
 
-.sheet__page {
-  width: 100%;
-  margin-bottom: 10px;
-}
-
 .bookrow__edit {
   min-width: 48px;
   min-height: 48px;
@@ -1109,8 +1097,7 @@
 /* --- 가로(landscape) — 카메라+사진 집중 --- */
 @media (orientation: landscape) {
   /* 카메라: 다크 풀블리드 유지, 컨트롤을 우측 안전영역으로 */
-  .cam__video,
-  .cam__freeze {
+  .cam__video {
     object-fit: cover;
   }
   .bottom {
@@ -1332,7 +1319,6 @@
 
 /* 카메라 + 스크림 숨김 */
 .cam.mode--input .cam__video,
-.cam.mode--input .cam__freeze,
 .cam.mode--input .cam__scrim {
   display: none;
 }
@@ -1457,30 +1443,27 @@
   color: #ff6b6b;
 }
 
-/* 입력 모드 tagrow — 항상 인터랙티브 */
-.cam.mode--input .inp__tagrow {
-  opacity: 1;
-  pointer-events: auto;
+/* 라이트 배경 tagrow — 입력 패널 + 편집 시트 공용 */
+.tagrow--light {
   margin-bottom: 22px;
 }
 
-/* 입력 모드 tag 색상 (라이트 배경) */
-.inp__tagrow .tag {
+.tagrow--light .tag {
   background: var(--surface);
 }
 
-.inp__tagrow .tag__l {
+.tagrow--light .tag__l {
   color: var(--sub);
 }
 
-.inp__tagrow .tag.is-sel {
+.tagrow--light .tag.is-sel {
   background: var(--primary);
   color: #fff;
   transform: none;
   box-shadow: 0 6px 16px rgba(49, 130, 246, 0.3);
 }
 
-.inp__tagrow .tag.is-sel .tag__l {
+.tagrow--light .tag.is-sel .tag__l {
   color: rgba(255, 255, 255, 0.85);
 }
 
@@ -1546,8 +1529,8 @@
 .cropframe__grid .cf-v2 { left: 66.67%; top: 0; bottom: 0; width: 1px; }
 .cropframe__grid .cf-h1 { top: 33.33%; left: 0; right: 0; height: 1px; }
 .cropframe__grid .cf-h2 { top: 66.67%; left: 0; right: 0; height: 1px; }
-/* 동결(is-frozen) 중에도 크롭 프레임 유지 — 무엇이 저장될지 보여준다.
-   동결 중 프레임 조정도 저장에 반영됨(저장이 getRect()를 저장 시점에 읽음 — 의도). */
+/* 크롭 프레임은 라이브에서만 조작 — 크롭 rect는 셔터 시점에 확정(스냅샷, ADR-018).
+   편집 시트 열림 중에는 .cam.is-editing으로 포인터 차단. */
 
 /* 책 선택 바텀시트 (bookpicker) */
 .bookpick { position: fixed; inset: 0; z-index: 60; background: rgba(25,31,40,0.4); display: grid; place-items: end center; padding: 16px; }
