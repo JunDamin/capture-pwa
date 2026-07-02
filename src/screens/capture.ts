@@ -9,9 +9,10 @@ import { startCamera, stopCamera } from "../camera/camera.ts";
 import { cropResizeCompress } from "../lib/image.ts";
 import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
-import { addCapture, countCaptures, getBook, getSession, uuid } from "../db/db.ts";
+import { addCapture, countCaptures, currentRoundFor, getBook, getSession, uuid } from "../db/db.ts";
 import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../db/types.ts";
 import { consumeSharedText } from "../lib/install.ts";
+import { openBookPicker } from "../lib/bookpicker.ts";
 
 type Phase = "live" | "tagging" | "note";
 type Mode = "photo" | "input";
@@ -157,6 +158,26 @@ export function mountCapture(
 
     modeBtnPhoto.onclick = () => setMode("photo");
     modeBtnInput.onclick = () => setMode("input");
+
+    // ---- 책 전환 (pill 탭) — 입력 모드에서만 동작(런타임 가드) ----
+    const pillTitle = root.querySelector(".pill__title") as HTMLElement;
+    pillTitle.onclick = () => {
+      if (currentMode !== "input") return; // 사진 모드 불변(3초 루프)
+      openBookPicker({
+        currentBookId: session.bookId,
+        onPick: async (book) => {
+          const sid = await currentRoundFor(book.uuid);
+          session = (await getSession(sid))!;
+          // pill 전체 재렌더 — 제목 + 회독 목적 칩(이전 칩 잔류 방지). 입력 필드는 유지.
+          const proj = session.project
+            ? `<span class="sep">·</span> 🎯 ${esc(session.project)}`
+            : "";
+          pillTitle.innerHTML = `📚 ${esc(book.title)} ${proj}`;
+          count = await countCaptures(session.uuid);
+          cntEl.textContent = `📍 ${count} ›`;
+        },
+      });
+    };
 
     // ---- Initial camera startup (photo mode only) ----
     if (initialMode === "photo") {
