@@ -1044,6 +1044,27 @@
   width: 120px;
   text-align: right;
 }
+.detail__bookrow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.detail__book {
+  color: var(--sub);
+  font-size: 14px;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.detail__bookrow .btn-ghost {
+  flex: 0 0 auto;
+  height: 44px;
+  padding: 0 16px;
+  font-size: 14px;
+}
 .detail__stamp {
   color: var(--sub);
   font-size: 13px;
