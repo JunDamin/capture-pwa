@@ -441,6 +441,11 @@
 .field--err {
   outline: 2px solid #ff6b6b;
 }
+.setting__s {
+  color: var(--sub);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
 .btn-ghost {
   flex: 1;
   height: 50px;

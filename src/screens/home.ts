@@ -40,7 +40,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
       <button class="btn-primary home__start">▶ 독서 시작</button>
       ${rest.length ? `<div class="sectit">다른 책</div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
       ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
-      <button class="home__transfer">백업·가져오기</button>
+      <button class="home__transfer">백업·설정</button>
       <div class="home__ver">build ${__BUILD__}</div>
     </div>`;
 
