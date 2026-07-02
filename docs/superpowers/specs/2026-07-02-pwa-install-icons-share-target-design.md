@@ -54,7 +54,21 @@
 3. 수신 시뮬: `/?shared_text=...`(또는 `./?shared_text=`)로 접속 → 열린 세션 있으면 입력모드 passage 프리필 / 없으면 books.
 4. 실기기: (iOS) 홈화면 추가 시 PNG 아이콘 표시·안내 시트, (Android) 설치 prompt 동작·이북 공유 목록에 Capture 표시·텍스트 수신.
 
+## 검토 조정 (충돌 감사 반영 — 구속)
+
+1. **[MUST] workbox 설정** — `?shared_text=` 쿼리가 프리캐시 매칭을 깨서 **오프라인 공유 실행이 실패**함(workbox 기본은 utm_/fbclid만 무시). 반드시:
+   ```ts
+   workbox: {
+     globPatterns: ["**/*.{js,css,html,svg,woff2,png}"],   // png 추가
+     navigateFallback: null,
+     ignoreURLParametersMatching: [/^utm_/, /^shared_/],   // 공유 파라미터 무시
+   },
+   ```
+2. **[SHOULD] pendingSharedText 잔류 방지** — books 경유 시 사용자가 사진 모드를 고르면 미소비 텍스트가 영구 잔류. 두 가지 다 적용: (a) `books.ts` renderProject에서 `hasPendingSharedText()`면 `selectedMode` 초기값을 `"input"`으로, (b) `capture.ts` run() 진입 시 photo 모드면 `consumeSharedText()`를 호출해 버림(무조건 클리어).
+3. **[SHOULD] 수신 가드** — `shared_text.slice(0, 10_000)` 길이 제한 + text/url 모두 비면 공유로 취급 안 함(빈 프리필 방지).
+4. **구현 위치(참고)** — 시작 감지는 `main.ts`의 `boot()`(mountApp 뒤, 기존 `nav({name:"home"})` 자리를 대체) — `openSession()` async가 이미 있는 async 컨텍스트에 자연스럽게 들어감. `mountApp`은 동기 유지. `beforeinstallprompt` 리스너는 `install.ts` 모듈 초기화(정적 import)에서 등록 — 타이밍 충분.
+
 ## 미해결/주의
-- workbox `globPatterns`에 `png` 추가 필요(현재 `js,css,html,svg,woff2`).
-- share_target의 `action: "./"`는 시작 URL과 같아 SW 프리캐시로 오프라인에도 동작. 쿼리 파라미터만 다름.
+- share_target의 `action: "./"`는 manifest 기준 상대 → `/capture-pwa/`로 정확히 해석(검토 확인). 오프라인 동작은 위 1번 조정이 전제.
 - iOS 공유 수신 개선(단축어/클립보드 자동 감지)은 추후 별건.
+- home 설치 버튼은 렌더 시 동기 `isStandalone()` 체크로 조건 포함(innerHTML 패턴 유지).
