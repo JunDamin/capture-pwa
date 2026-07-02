@@ -52,8 +52,8 @@ export function openBookPicker(
 ### 4. 입력모드 "생각만 캡처" 허용 (추가 요구)
 - **맥락:** 책 전반에 드는 생각을 — 특정 구절(passage)이나 사진 없이 — 기록하고 싶다. 모델(ADR-014 `isValidCapture` = 사진‖담은글‖메모 + 태그)은 이미 허용; **입력모드 UI만 passage를 강제**(capture.ts:306, placeholder "(필수)").
 - **변경(capture.ts 입력모드만):**
-  - 검증: `if (!passageVal) reject` → **`if (!passageVal && !noteVal)`**(둘 다 비면 두 필드 모두 `field--err` + return). 그 아래 기존 `isValidCapture` 검사 유지.
-  - note 입력에도 `oninput` 에러 클리어 추가(passage와 동일 패턴).
+  - 검증: `if (!passageVal) reject` → **`if (!passageVal && !noteVal)`**(둘 다 비면 두 필드 모두 `field--err` + return). 그 아래 기존 `isValidCapture` 검사 유지. (note 요소 실명: `inpNote`.)
+  - note 입력에도 `oninput` 에러 클리어 추가(passage와 동일 패턴). **[델타검토 3] 두 리셋 경로(setMode("photo") :153 부근, 저장 후 초기화 :350 부근)에서도 `inpNote`의 `field--err` 클리어 추가**(현재 passage만 클리어).
   - placeholder: 담은 글 "(필수)" → **"(선택)"**; note placeholder는 현행 유지(또는 "내 생각 — 이것만 적어도 저장돼요" 톤 확인 후 plain하게).
   - 파일 헤더 주석 "passage(필수)" → "passage 또는 note ≥1"로 정정.
 - 표시/Export/PDF는 이미 메모-only 캡처를 처리(사진 모드가 원래 메모만 저장 가능) — 변경 없음.
@@ -70,17 +70,27 @@ export function openBookPicker(
   - 책 Review: 회독 배지·✎(회독 번호/제목 편집)·**"새 회독 시작" 버튼**·회독 구분선(roundsep) 제거. 목록은 `capturesForBook`(flat) + 날짜 구분선(§5).
   - 세션 스코프 Review(캡처 카운트 칩 진입): 유지하되 문구 중립화 — "이번 회독" → **"최근 기록"**; "이 회독 삭제" 위험 링크는 **제거**(책 삭제로 충분 — 위험 액션 감소).
   - Export 스코프 라벨: "이번 회독" → **"최근 기록"**(prompt.md 범위 라벨 동일).
-- **남기는 구조(잠복):** db의 회독 헬퍼 전부(미사용화되어도 삭제 안 함 — 재도입 여유), `Session.roundNo`, capture pill의 `session.project` 표시(설정 경로가 없어져 자연히 안 보임), bookpicker의 회독 배지는 **캡처 수로 대체**.
-- ADR-016에 개정 메모(회독 UI 잠복, 데이터 모델 유지 — 재도입 시 UI만 복원).
+- **남기는 구조(잠복):** db의 회독 헬퍼 전부(미사용화되어도 삭제 안 함 — 재도입 여유; review.ts import는 정리: capturesWithRoundsForBook/deleteSession/displayRoundNo/putSession/sessionsForBook/startNewSession 드롭, capturesForBook 추가 — 델타검토 6), `Session.roundNo`, bookpicker는 캡처 수 표시.
+- **[델타검토 5] books.ts renderProject(새 책 시작 화면)의 회독 문구 중립화:** topbar/버튼 "회독 시작" → **"독서 시작"**, "회독 제목 (선택)" → **"목적 (선택)"**(project는 계속 설정 가능 — pill 🎯·prompt.md 목적에 유용해 유지, "설정 경로 소멸" 아님을 정정). 삭제 confirm(books.ts:99) "모든 회독·캡처" → **"모든 기록·캡처"**, transfer 복원 flash "회독 N" → **"기록 N"**.
+- CSS 정리: `.hero__round`/`.roundsep`/`.review__editproj`는 review 전용 — 제거 가능. `.scopebtn`은 유지(세션 스코프 버튼).
+- ADR-016에 개정 메모 + **glossary.md의 "새 회독 시작" 항목도 갱신**(델타검토).
 
 ### 7. 입력모드 필드 순서 재배치 (추가 요구)
 - **맥락:** 사진 모드 플로우(셔터 → **태그** → 글)와 논리 일치 — 태그(느낌)를 먼저 고르고 쓰는 흐름.
-- **변경(capture.ts 입력모드 마크업):** 순서를 **① 태그 선택 → ② 담은 글(passage) → ③ 내 생각(note) → ④ 페이지 → 저장**으로 재배치(현재 순서는 구현자가 확인 후 재배열). 배선/검증 로직은 순서 무관 — 마크업+CSS 조정 위주. 자동 포커스는 재배치 후에도 자연스러운 첫 입력(태그는 탭 선택이므로 포커스 대상은 여전히 passage 유지 — 단, 시각 순서상 태그가 위).
+- **변경(capture.ts 입력모드 마크업):** 현재 순서(passage → note → page → hint → tagrow → save, capture.ts:429-439)를 **① `.inp__hint` + `.inp__tagrow`(태그 — hint는 태그 에러 안내이므로 함께 이동, 델타검토 4) → ② 담은 글 → ③ 내 생각 → ④ 페이지 → 저장**으로 재배열. 배선·CSS 전부 클래스 셀렉터(형제 셀렉터 없음 — 검토 확인)라 마크업 이동 안전. 자동 포커스는 passage 유지.
 - 공유 수신 프리필(passage)·에러 표시(§4) 동작 불변.
 
 ### 8. 입력모드 저장 토스트 (추가 요구)
 - **맥락:** 입력 저장 시 확인 피드백이 약해 사용자가 당황 — 명확한 토스트 필요.
-- **변경(capture.ts):** 입력모드 저장 성공 시 토스트 **"저장했어요"**(기존 앱 토스트 톤 "~했어요"와 일관 — books/export의 `.toast` 패턴 재사용) **~3초** 표시 후 사라짐. 기존 `.done` 배지(사진 모드 시그니처)와 별개 — 입력모드는 토스트가 주 피드백. 저장 후 필드 초기화(기존 동작) 유지.
+- **변경(capture.ts):** 입력모드 저장 성공 시 토스트 **"저장했어요"** ~3초.
+- **[델타검토 1] 입력 저장이 이미 `showDone()`(전면 ✓ 배지)을 호출 중(capture.ts:353)** → 토스트 추가 시 **입력 경로의 showDone() 제거**(이중 피드백 방지). 사진 경로(:250)는 불변.
+- **[델타검토 2]** capture 템플릿에 `.toast` 없음 → 추가(books/export 패턴). `.toast`가 저장 버튼 위에 3초 얹히므로 **`pointer-events: none`** 부여. 연속 저장 시 타이머 리셋.
+
+### 9. 동결 화면에서 크롭 프레임 유지 (추가 요구)
+- **문제:** 셔터 후 동결(freeze) 미리보기에 크롭 프레임이 숨겨져(`.cam.is-frozen .cropframe { display:none }` — 크롭 배치 때 추가) **전체 사진이 보임** → 사용자가 크롭이 안 된 걸로 착각. 실제 저장은 프레임 영역만.
+- **변경:** 해당 숨김 규칙 **제거** — 동결 상태에서도 프레임+마스크가 동결 사진 위에 유지(무엇이 저장될지 정직하게 표시). 입력모드 숨김(`.cam.mode--input .cropframe`)은 유지.
+- **부수 효과(의도):** 저장이 저장 시점의 `cropFrame.getRect()`를 읽으므로, 동결 중 프레임 조정도 **저장에 반영**(보이는 대로 저장 — 찍고 나서 미세조정 가능).
+- z-index 확인: 프레임 z2 < freeze(z1) 위 OK, 컨트롤(z3)·시트(z4/5) 아래 — 태그/시트 조작 방해 없음. 성능·3초 루프 영향 없음(CSS 규칙 1줄).
 
 ## 의도된 비동작 (검토 7 — 문서화)
 - **같은 책 pick = 순수 닫기** → 같은 책의 옛 회독 캡처를 현재 회독으로 옮기는 건 범위 밖.
