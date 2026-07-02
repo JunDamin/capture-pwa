@@ -1,6 +1,6 @@
-/** Home — 지금 읽는 책(이어읽기) + 최근 세션 + 독서 시작. PRD §8-A, 토스 라이트. */
+/** Home — 최근 책 목록(회독 배지). PRD §8-A, 토스 라이트. */
 import type { Nav } from "../app.ts";
-import { openSession, recentSessions, startNewSession, type SessionView } from "../db/db.ts";
+import { recentBooks, currentRoundFor, type BookView } from "../db/db.ts";
 import { isStandalone, promptInstall } from "../lib/install.ts";
 
 declare const __BUILD__: string; // vite define — 빌드 시각 스탬프
@@ -25,30 +25,20 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   (async () => {
-    const [open, recent] = await Promise.all([openSession(), recentSessions(8)]);
-    render(open, recent);
+    const books = await recentBooks(8);
+    render(books);
   })();
 
-  function render(open: SessionView | null, recent: SessionView[]) {
-    const top = open
-      ? topCard(open, "이어 읽기", true)
-      : recent[0]
-        ? topCard(recent[0], "다시 읽기", false)
-        : emptyCard();
-
-    const rest = recent.filter((r) => !open || r.session.uuid !== open.session.uuid);
+  function render(books: BookView[]) {
+    const top = books[0] ? topCard(books[0]) : emptyCard();
+    const rest = books.slice(1);
 
     root.innerHTML = `
     <div class="scr scr--light home">
-      <h1 class="home__h">지금 읽는 책</h1>
+      <h1 class="home__h">내 책</h1>
       ${top}
-      <button class="btn-primary home__start">${open ? "+ 다른 책으로 시작" : "▶ 독서 시작"}</button>
-      ${
-        rest.length
-          ? `<div class="sectit">최근 세션</div>
-             <div class="recent">${rest.map(recentItem).join("")}</div>`
-          : ""
-      }
+      <button class="btn-primary home__start">▶ 독서 시작</button>
+      ${rest.length ? `<div class="sectit">다른 책</div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
       ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
       <button class="home__transfer">백업·가져오기</button>
       <div class="home__ver">build ${__BUILD__}</div>
@@ -67,48 +57,61 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
       else if (r === "unavailable") showIosInstallSheet(root);
     };
 
-    const topEl = root.querySelector(".bookcard[data-action]") as HTMLElement | null;
-    if (topEl) topEl.onclick = () => handleSessionTap(topEl.dataset.id!, topEl.dataset.open === "1");
-    if (!open && !recent.length) {
+    if (!books.length) {
       (root.querySelector(".emptycard") as HTMLElement).onclick = () => nav({ name: "books" });
     }
 
-    root.querySelectorAll<HTMLElement>(".recent .item").forEach((el) => {
-      el.onclick = () => handleSessionTap(el.dataset.id!, el.dataset.open === "1");
+    // 본문 탭 = 책 Review
+    root.querySelectorAll<HTMLElement>("[data-book]").forEach((el) => {
+      if (!el.classList.contains("bookcard") && !el.classList.contains("item")) return;
+      el.onclick = () => nav({ name: "review", scope: "book", id: el.dataset.book! });
     });
 
+    // 📷/✍️ = 현재 회독에 캡처(get-or-create)
     root.querySelectorAll<HTMLElement>(".card-modes .cm-btn").forEach((btn) => {
       btn.onclick = async (ev) => {
         ev.stopPropagation();
-        const card = btn.closest("[data-id]") as HTMLElement;
-        const sessionId = card.dataset.id!;
-        const bookId = card.dataset.book!;
-        const isOpen = card.dataset.open === "1";
-        const mode = btn.dataset.mode as "photo" | "input";
-        const id = isOpen ? sessionId : await startNewSession(bookId);
-        nav({ name: "capture", sessionId: id, mode });
+        const card = btn.closest("[data-book]") as HTMLElement;
+        const sid = await currentRoundFor(card.dataset.book!);
+        nav({ name: "capture", sessionId: sid, mode: btn.dataset.mode as "photo" | "input" });
       };
     });
   }
 
-  function handleSessionTap(sessionId: string, _isOpen: boolean) {
-    nav({ name: "review", scope: "session", id: sessionId });
+  function roundLabel(v: BookView): string {
+    if (!v.totalRounds) return "캡처 전";
+    const t = v.currentRound?.project ? ` · ${esc(v.currentRound.project)}` : "";
+    return `${v.roundNumber}회독${t}`;
   }
 
-  function topCard(v: SessionView, _cta: string, isOpen: boolean) {
+  function topCard(v: BookView) {
     return `
-    <div class="bookcard" data-action data-id="${v.session.uuid}" data-open="${isOpen ? 1 : 0}" data-book="${v.session.bookId}">
+    <div class="bookcard" data-action data-book="${v.book.uuid}">
       <div class="bookcard__row">
-        <div class="cover cov-1">${esc(v.bookTitle).slice(0, 6)}</div>
+        <div class="cover cov-1">${esc(v.book.title).slice(0, 6)}</div>
         <div class="bookcard__body">
-          <div class="booktitle">${esc(v.bookTitle)}</div>
-          ${v.session.project ? `<div class="bookmeta">🎯 ${esc(v.session.project)}</div>` : ""}
-          <div class="sessionchip">
-            <span class="dot ${isOpen ? "" : "dot--off"}"></span>
-            ${isOpen ? "현재 세션" : relTime(v.lastActivity)} · ${v.count} Captures
-          </div>
+          <div class="booktitle">${esc(v.book.title)}</div>
+          <div class="sessionchip"><span class="dot"></span>${roundLabel(v)} · ${v.captureCount} Captures</div>
         </div>
         <div class="chev">›</div>
+      </div>
+      <div class="card-modes">
+        <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
+        <button class="cm-btn cm-input" data-mode="input" aria-label="입력으로 캡처">✍️ 입력</button>
+      </div>
+    </div>`;
+  }
+
+  function bookItem(v: BookView, i: number) {
+    return `
+    <div class="item" data-book="${v.book.uuid}">
+      <div class="item__row">
+        <div class="mini ${coverClass(i)}"></div>
+        <div class="item__body">
+          <div class="item__t">${esc(v.book.title)}</div>
+          <div class="item__s">${roundLabel(v)} · ${v.captureCount} captures</div>
+        </div>
+        <div class="item__when">${v.lastActivity ? relTime(v.lastActivity) : ""}</div>
       </div>
       <div class="card-modes">
         <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
@@ -123,24 +126,6 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
       <div class="emptycard__emoji">📖</div>
       <div class="emptycard__t">첫 생각을 붙잡아 보세요</div>
       <div class="emptycard__s">책을 고르면 캡처가 시작됩니다</div>
-    </div>`;
-  }
-
-  function recentItem(v: SessionView, i: number) {
-    return `
-    <div class="item" data-id="${v.session.uuid}" data-open="${v.session.ended == null ? 1 : 0}" data-book="${v.session.bookId}">
-      <div class="item__row">
-        <div class="mini ${coverClass(i)}"></div>
-        <div class="item__body">
-          <div class="item__t">${esc(v.bookTitle)}</div>
-          <div class="item__s">${v.count} captures${v.session.project ? " · " + esc(v.session.project) : ""}</div>
-        </div>
-        <div class="item__when">${v.session.ended == null ? "진행 중" : relTime(v.lastActivity)}</div>
-      </div>
-      <div class="card-modes">
-        <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
-        <button class="cm-btn cm-input" data-mode="input" aria-label="입력으로 캡처">✍️ 입력</button>
-      </div>
     </div>`;
   }
 

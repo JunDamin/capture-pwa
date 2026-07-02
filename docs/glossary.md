@@ -5,9 +5,9 @@
 ## 핵심 도메인
 
 - **Book** — 사용자가 읽는 책. 등록은 책당 1회. 필수: `title`. 선택: `author`, `isbn`, `cover`. (ADR-006)
-- **Session** — 한 책에 대한 한 번의 독서 흐름. Book과 1:N. `started`, `ended`(nullable), `project`(선택). 명시적 시작 + 느슨한 자동 종료(8h 비활동). (ADR-005)
-- **Capture** — 독서 중 붙잡은 하나의 생각. Session에 속함. 유효 조건: `(image 또는 passage 또는 note) + tag`. (ADR-004, ADR-014)
-- **Project (목적)** — 세션에 붙는 선택적 맥락("지방교육 프로젝트"). "왜 이 책을 읽는가". Capture 화면 상단에 항상 표시.
+- **Session (회독)** — 한 책의 N번째 읽기. UI/문서 용어는 **회독**, 코드 식별자는 `Session` 유지. Book과 1:N. `started`, `ended`(nullable), `project`(회독 제목, 선택). 회독 번호는 저장하지 않고 계산(`started` asc 1-based, `roundNumberOf`). 자동 종료 없음 — "새 회독 시작"(`startNewSession`)이 그 책의 열린 회독만 닫고 새로 시작; 캡처 진입·공유 수신은 `currentRoundFor`(get-or-create, 아무것도 닫지 않음). (ADR-005 개정, ADR-016)
+- **Capture** — 독서 중 붙잡은 하나의 생각. Session(회독)에 속함. 유효 조건: `(image 또는 passage 또는 note) + tag`. (ADR-004, ADR-014)
+- **Project (회독 제목)** — 회독에 붙는 선택적 제목("지방교육 프로젝트"). "왜 이 책을 읽는가". Capture 화면 상단에 항상 표시, Review에서 사후 편집 가능. 코드 필드명은 `Session.project`. (ADR-016)
 
 ## Capture의 구성요소
 

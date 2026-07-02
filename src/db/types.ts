@@ -24,6 +24,7 @@ export interface Session {
   project?: string;
   started: number;
   ended: number | null; // 열린 세션 = null — ADR-005
+  roundNo?: number | null; // 회독 번호 수정용 override — 표시 = roundNo ?? 계산
 }
 
 export interface Capture {

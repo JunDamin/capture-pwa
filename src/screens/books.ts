@@ -1,7 +1,8 @@
-/** 책 선택 / 새 책 등록 → 세션 시작. PRD §8-A, ADR-005/006. */
+/** 책장 — 책 목록·새 책 등록(등록 직후 첫 회독 시작). PRD §8-A, ADR-005/006/016. */
 import type { Nav } from "../app.ts";
 import {
   capturesForBook,
+  currentRoundFor,
   deleteBook,
   listBooks,
   putBook,
@@ -26,7 +27,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     <div class="scr scr--light books">
       <div class="topbar">
         <button class="iconbtn back">‹</button>
-        <div class="topbar__t">독서 시작</div>
+        <div class="topbar__t">책장</div>
       </div>
 
       <div class="card form">
@@ -62,10 +63,18 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     };
     titleEl.oninput = () => titleEl.classList.remove("field--err");
 
+    // 행 탭 = 책 Review
     root.querySelectorAll<HTMLElement>(".recent .item").forEach((el) => {
-      el.onclick = () => {
-        chosen = books.find((b) => b.uuid === el.dataset.id) ?? null;
-        if (chosen) renderProject();
+      el.onclick = () => nav({ name: "review", scope: "book", id: el.dataset.id! });
+    });
+
+    // 📷/✍️ = 현재 회독에 캡처(get-or-create)
+    root.querySelectorAll<HTMLElement>(".card-modes .cm-btn").forEach((btn) => {
+      btn.onclick = async (ev) => {
+        ev.stopPropagation();
+        const row = btn.closest(".item") as HTMLElement;
+        const sid = await currentRoundFor(row.dataset.id!);
+        nav({ name: "capture", sessionId: sid, mode: btn.dataset.mode as "photo" | "input" });
       };
     });
 
@@ -83,7 +92,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         const id = el.dataset.del!;
         const b = books.find((x) => x.uuid === id);
         const caps = await capturesForBook(id);
-        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 세션·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
+        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 회독·캡처 ${caps.length}개가 지워집니다. 삭제할까요?`)) return;
         await deleteBook(id);
         books = await listBooks();
         renderList();
@@ -97,7 +106,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     <div class="scr scr--light books">
       <div class="topbar">
         <button class="iconbtn back">‹</button>
-        <div class="topbar__t">세션 시작</div>
+        <div class="topbar__t">회독 시작</div>
       </div>
 
       <div class="card">
@@ -105,14 +114,14 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
           chosen!.author ? ` <span class="proj__author">· ${esc(chosen!.author)}</span>` : ""
         }</div>
         <label class="proj__label">왜 이 책을 읽나요? <span class="opt">선택</span></label>
-        <input class="field project" placeholder="예: 지방교육 프로젝트" autocomplete="off" />
+        <input class="field project" placeholder="회독 제목 (선택)" autocomplete="off" />
         <div class="proj__hint">목적은 캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
         <label class="proj__label">시작 모드</label>
         <div class="mode-toggle mode-toggle--light proj__modesel">
           <button class="mode-btn mode-btn--photo${selectedMode === "photo" ? " is-active" : ""}" aria-label="사진 모드">📷 사진</button>
           <button class="mode-btn mode-btn--input${selectedMode === "input" ? " is-active" : ""}" aria-label="입력 모드">✍️ 입력</button>
         </div>
-        <button class="btn-primary start">세션 시작</button>
+        <button class="btn-primary start">회독 시작</button>
       </div>
     </div>`;
 
@@ -183,14 +192,20 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
 function bookRow(b: Book) {
   return `
   <div class="item" data-id="${b.uuid}">
-    <div class="mini cov-1"></div>
-    <div class="item__body">
-      <div class="item__t">${esc(b.title)}</div>
-      ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}
+    <div class="item__row">
+      <div class="mini cov-1"></div>
+      <div class="item__body">
+        <div class="item__t">${esc(b.title)}</div>
+        ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}
+      </div>
+      <button class="bookrow__edit" data-edit="${b.uuid}" aria-label="책 편집">✎</button>
+      <button class="bookrow__del" data-del="${b.uuid}" aria-label="책 삭제">🗑</button>
+      <div class="chev">›</div>
     </div>
-    <button class="bookrow__edit" data-edit="${b.uuid}" aria-label="책 편집">✎</button>
-    <button class="bookrow__del" data-del="${b.uuid}" aria-label="책 삭제">🗑</button>
-    <div class="chev">›</div>
+    <div class="card-modes">
+      <button class="cm-btn cm-photo" data-mode="photo" aria-label="사진으로 캡처">📷 사진</button>
+      <button class="cm-btn cm-input" data-mode="input" aria-label="입력으로 캡처">✍️ 입력</button>
+    </div>
   </div>`;
 }
 
