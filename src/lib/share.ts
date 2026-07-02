@@ -20,12 +20,13 @@ export function canShareFiles(files: ShareFile[]): boolean {
 
 export type ShareResult = "shared" | "cancelled" | "unsupported" | "error";
 
-/** prompt.md + 사진을 한 번에 공유. 미지원/취소/에러를 구분해 반환. */
-export async function shareFiles(files: ShareFile[], title: string): Promise<ShareResult> {
+/** prompt.md + 사진을 한 번에 공유. 미지원/취소/에러를 구분해 반환. text는 선택적으로 공유 페이로드에 포함(많은 앱이 파일과 함께 올 때 무시하지만 지원하는 경우 활용). */
+export async function shareFiles(files: ShareFile[], title: string, text?: string): Promise<ShareResult> {
   if (!canShareFiles(files)) return "unsupported";
-  const data = {
+  const data: ShareData = {
     title,
     files: files.map((f) => new File([f.blob], f.name, { type: f.blob.type })),
+    ...(text ? { text } : {}),
   };
   try {
     await (navigator as Navigator).share(data);
