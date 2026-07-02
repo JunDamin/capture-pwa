@@ -6,10 +6,10 @@ import {
   currentRoundFor,
   deleteCapture,
   deleteSession,
+  displayRoundNo,
   getBook,
   getSession,
   putSession,
-  roundNumberOf,
   sessionsForBook,
   startNewSession,
 } from "../db/db.ts";
@@ -37,7 +37,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       title = book?.title ?? "(책)";
       const ss = await sessionsForBook(s.bookId);
       currentRound = s;
-      currentRoundNo = roundNumberOf(ss, s.uuid);
+      currentRoundNo = displayRoundNo(ss, s);
       caps = await capturesForSession(id);
     } else {
       bookId = id;
@@ -45,7 +45,12 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       title = book?.title ?? "(책)";
       const ss = await sessionsForBook(id);
       currentRound = ss.filter((s) => s.ended == null).sort((a, b) => b.started - a.started)[0] ?? null;
-      currentRoundNo = currentRound ? roundNumberOf(ss, currentRound.uuid) : ss.length;
+      const latest = [...ss].sort((a, b) => b.started - a.started)[0];
+      currentRoundNo = currentRound
+        ? displayRoundNo(ss, currentRound)
+        : latest
+          ? displayRoundNo(ss, latest)
+          : 0;
       groups = await capturesWithRoundsForBook(id);
       caps = groups.flatMap((g) => g.captures);
     }
@@ -153,14 +158,34 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     const editProj = root.querySelector(".review__editproj") as HTMLElement | null;
     if (editProj && currentRound) {
       editProj.onclick = () => {
+        let changed = false;
+        // 회독 번호 — 취소(null)하면 번호 유지, 제목 편집은 계속
+        const noStr = prompt("회독 번호", String(currentRoundNo || 1));
+        if (noStr !== null) {
+          const n = parseInt(noStr, 10);
+          if (Number.isFinite(n) && n >= 1 && n !== currentRoundNo) {
+            currentRound = { ...currentRound!, roundNo: n };
+            currentRoundNo = n;
+            changed = true;
+          }
+        }
         const cur = currentRound!.project ?? "";
         const next = prompt("왜 이 책을 읽나요?", cur);
-        if (next === null) return;
-        const project = next.trim() || undefined;
-        currentRound = { ...currentRound!, project };
-        if (session && session.uuid === currentRound.uuid) session = currentRound;
-        groups = groups.map((g) => (g.session.uuid === currentRound!.uuid ? { ...g, session: currentRound! } : g));
-        putSession(currentRound).then(() => render(caps)).catch((e) => console.error("putSession failed", e));
+        if (next !== null) {
+          const project = next.trim() || undefined;
+          if (project !== currentRound!.project) {
+            currentRound = { ...currentRound!, project };
+            changed = true;
+          }
+        }
+        if (!changed) return;
+        if (session && session.uuid === currentRound!.uuid) session = currentRound;
+        groups = groups.map((g) =>
+          g.session.uuid === currentRound!.uuid
+            ? { ...g, session: currentRound!, roundNumber: currentRound!.roundNo ?? g.roundNumber }
+            : g,
+        );
+        putSession(currentRound!).then(() => render(caps)).catch((e) => console.error("putSession failed", e));
       };
     }
 

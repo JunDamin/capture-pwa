@@ -193,8 +193,11 @@ async function endOpenRoundsForBook(bookId: string, now: number): Promise<void> 
 /** 새 세션(회독) 시작 — 그 책의 열린 회독 종료 후 생성(ADR-005, ADR-016). 새 세션 uuid 반환. */
 export async function startNewSession(bookId: string, project?: string): Promise<string> {
   const now = Date.now();
+  const ss = await sessionsForBook(bookId);
+  const prev = [...ss].sort((a, b) => b.started - a.started)[0];
+  const nextNo = prev ? displayRoundNo(ss, prev) + 1 : 1;
   await endOpenRoundsForBook(bookId, now);
-  const session: Session = { uuid: uuid(), bookId, project, started: now, ended: null };
+  const session: Session = { uuid: uuid(), bookId, project, started: now, ended: null, roundNo: nextNo };
   await putSession(session);
   return session.uuid;
 }
@@ -204,7 +207,9 @@ export async function currentRoundFor(bookId: string): Promise<string> {
   const ss = await sessionsForBook(bookId);
   const open = ss.filter((s) => s.ended == null).sort((a, b) => b.started - a.started);
   if (open.length) return open[0].uuid; // 레거시 다중 열림: 최근 것
-  const session: Session = { uuid: uuid(), bookId, started: Date.now(), ended: null };
+  const prev = [...ss].sort((a, b) => b.started - a.started)[0];
+  const nextNo = prev ? displayRoundNo(ss, prev) + 1 : 1;
+  const session: Session = { uuid: uuid(), bookId, started: Date.now(), ended: null, roundNo: nextNo };
   await putSession(session);
   return session.uuid;
 }
@@ -213,6 +218,11 @@ export async function currentRoundFor(bookId: string): Promise<string> {
 export function roundNumberOf(sessions: Session[], sessionId: string): number {
   const sorted = [...sessions].sort((a, b) => a.started - b.started);
   return sorted.findIndex((s) => s.uuid === sessionId) + 1;
+}
+
+/** 표시용 회독 번호 — override(roundNo) 있으면 그것, 없으면 계산값. */
+export function displayRoundNo(sessions: Session[], s: Session): number {
+  return s.roundNo ?? roundNumberOf(sessions, s.uuid);
 }
 
 export interface BookView {
@@ -246,7 +256,9 @@ export async function recentBooks(n: number): Promise<BookView[]> {
     views.push({
       book,
       currentRound,
-      roundNumber: currentRound ? roundNumberOf(ss, currentRound.uuid) : ss.length,
+      roundNumber: currentRound
+        ? displayRoundNo(ss, currentRound)
+        : displayRoundNo(ss, [...ss].sort((a, b) => b.started - a.started)[0]),
       totalRounds: ss.length,
       captureCount,
       lastActivity,
@@ -263,7 +275,7 @@ export async function capturesWithRoundsForBook(
   const out: { roundNumber: number; session: Session; captures: Capture[] }[] = [];
   for (let i = 0; i < ss.length; i++) {
     const captures = await capturesForSession(ss[i].uuid);
-    if (captures.length) out.push({ roundNumber: i + 1, session: ss[i], captures });
+    if (captures.length) out.push({ roundNumber: displayRoundNo(ss, ss[i]), session: ss[i], captures });
   }
   return out;
 }
