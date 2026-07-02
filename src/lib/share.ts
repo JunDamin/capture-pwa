@@ -1,6 +1,6 @@
 /**
- * 전달 — ADR-008. 1순위: Web Share API로 prompt.md + 사진을 파일로 함께.
- * 보조: 프롬프트 클립보드 복사, 개별 다운로드.
+ * 전달 — ADR-008(ADR-019 개정). 현재 호출은 PDF 1개 + 텍스트(프롬프트)를 Web Share로 공유.
+ * 보조: 클립보드 복사, 다운로드. 다중 파일 공유 능력은 범용으로 유지.
  */
 
 export interface ShareFile {
@@ -20,7 +20,7 @@ export function canShareFiles(files: ShareFile[]): boolean {
 
 export type ShareResult = "shared" | "cancelled" | "unsupported" | "error";
 
-/** prompt.md + 사진을 한 번에 공유. 미지원/취소/에러를 구분해 반환. text는 선택적으로 공유 페이로드에 포함(많은 앱이 파일과 함께 올 때 무시하지만 지원하는 경우 활용). */
+/** 파일(현재는 PDF 1개)을 공유. 미지원/취소/에러를 구분해 반환. text는 선택적으로 공유 페이로드에 포함(많은 앱이 파일과 함께 올 때 무시하지만 지원하는 경우 활용). */
 export async function shareFiles(files: ShareFile[], title: string, text?: string): Promise<ShareResult> {
   if (!canShareFiles(files)) return "unsupported";
   const data: ShareData = {

@@ -46,7 +46,7 @@ export interface Capture {
   exportStatus: "none" | "exported";
 }
 
-/** 유효성 — ADR-014: (image 또는 passage) + tag. memo는 레거시 호환. */
+/** 유효성 — ADR-014: (image ‖ passage ‖ memo) + tag. 생각(memo)만 저장하는 것도 1급 경로. */
 export function isValidCapture(c: Pick<Capture, "image" | "passage" | "memo" | "tag">): boolean {
   const hasContent =
     c.image != null ||
