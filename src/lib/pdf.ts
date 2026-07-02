@@ -1,12 +1,11 @@
-/** prompt.md 본문 + 사진을 단일 PDF로. 한글은 canvas 렌더(Pretendard)로 — jsPDF 폰트 임베딩 회피. ADR-008. */
+/** 요약 표지 + 사진을 단일 PDF로(자료 전용 — 지시문은 클립보드 프롬프트가 담당). 한글은 canvas 렌더(Pretendard) — jsPDF 폰트 임베딩 회피. ADR-008. */
 import { jsPDF } from "jspdf";
-import { buildExport, type ExportContext } from "./prompt.ts";
+import type { ExportContext } from "./prompt.ts";
 import { TAGS, type Capture } from "../db/types.ts";
 
 const W = 1240;
 const H = 1754;
 const M = 90;
-const LINE = 40;
 const INK = "#191F28";
 const SUB = "#8B95A1";
 
@@ -78,7 +77,6 @@ function blobToDataUrl(blob: Blob): Promise<string> {
 
 export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   await ensureFont();
-  const promptMd = buildExport(ctx).promptMd;
   const captures = ctx.captures;
 
   // 페이지를 쌓아두지 않고 하나씩 즉시 PDF에 넣고 canvas 백킹스토어를 해제한다.
@@ -93,40 +91,47 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     canvas.height = 0;
   };
 
-  // --- 텍스트 페이지: 프롬프트 본문 ---
-  let pg = blank();
-  let y = M;
-  const setBody = () => {
-    pg.g.fillStyle = INK;
-    pg.g.font = "400 28px Pretendard";
+  // --- 표지 1장: 요약 + 한 줄 안내 (지시문은 함께 붙여넣는 메시지가 담당 — PDF는 자료) ---
+  const pg = blank();
+  let y = M + 40;
+  pg.g.fillStyle = INK;
+  pg.g.font = "700 44px Pretendard";
+  for (const ln of wrap(pg.g, `독서 캡처 — ${ctx.bookTitle}${ctx.author ? ` (${ctx.author})` : ""}`, W - M * 2)) {
+    pg.g.fillText(ln, M, y);
+    y += 58;
+  }
+  y += 10;
+  pg.g.font = "400 30px Pretendard";
+  const dates = captures.map((c) => c.createdAt);
+  const fmtD = (ts: number) => {
+    const d = new Date(ts);
+    return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`;
   };
-  setBody();
-  for (const ln of wrap(pg.g, promptMd, W - M * 2)) {
-    if (y > H - M) {
-      addPage(pg.c);
-      pg = blank();
-      setBody();
-      y = M;
-    }
-    if (ln.startsWith("# ")) {
-      pg.g.font = "700 40px Pretendard";
-      pg.g.fillText(ln.slice(2), M, y);
-      y += 54;
-      setBody();
-    } else if (ln.startsWith("## ")) {
-      pg.g.font = "700 32px Pretendard";
-      pg.g.fillText(ln.slice(3), M, y);
-      y += 46;
-      setBody();
-    } else if (ln.startsWith("### ")) {
-      pg.g.font = "600 30px Pretendard";
-      pg.g.fillText(ln.slice(4), M, y);
-      y += 42;
-      setBody();
-    } else {
-      pg.g.fillText(ln, M, y);
-      y += LINE;
-    }
+  const period = dates.length
+    ? (() => {
+        const a = fmtD(Math.min(...dates));
+        const b = fmtD(Math.max(...dates));
+        return a === b ? a : `${a} ~ ${b}`;
+      })()
+    : null;
+  const infoLines = [
+    `범위: ${ctx.scopeLabel}${ctx.project ? ` · 목적: ${ctx.project}` : ""}`,
+    period ? `기간: ${period}` : null,
+    `캡처: ${captures.length}개 (사진 ${captures.filter((c) => c.image).length}장)`,
+  ].filter(Boolean) as string[];
+  for (const ln of infoLines) {
+    pg.g.fillText(ln, M, y);
+    y += 44;
+  }
+  y += 24;
+  pg.g.fillStyle = SUB;
+  pg.g.font = "400 26px Pretendard";
+  const guide =
+    "이 PDF는 독서 캡처 사진 모음입니다. 처리 지시는 함께 붙여넣은 메시지를 따르세요. " +
+    "각 사진 페이지의 캡션에 태그·시각·담은 글·내 생각이 있습니다.";
+  for (const ln of wrap(pg.g, guide, W - M * 2)) {
+    pg.g.fillText(ln, M, y);
+    y += 36;
   }
   addPage(pg.c);
 
