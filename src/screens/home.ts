@@ -3,7 +3,13 @@ import type { Nav } from "../app.ts";
 import { recentBooks, currentRoundFor, type BookView } from "../db/db.ts";
 import { isStandalone, promptInstall } from "../lib/install.ts";
 
-declare const __BUILD__: string; // vite define — 빌드 시각 스탬프
+declare const __BUILD__: number; // vite define — 빌드 시각(epoch ms). 표시 시 기기 로컬 시간대로 포맷.
+
+function buildLabel(): string {
+  const d = new Date(__BUILD__);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
 
 function relTime(ts: number): string {
   const days = Math.floor((startOfDay(Date.now()) - startOfDay(ts)) / 86400000);
@@ -44,7 +50,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
       ${rest.length ? `<div class="sectit">다른 책 <button class="home__books-link">책장 →</button></div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
       ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
       <button class="home__transfer">백업·설정</button>
-      <div class="home__ver">build ${__BUILD__}</div>
+      <div class="home__ver">build ${buildLabel()}</div>
     </div>`;
 
     const startBtn = root.querySelector(".home__start") as HTMLButtonElement;
