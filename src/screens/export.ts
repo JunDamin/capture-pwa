@@ -88,25 +88,27 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       const label = btn.textContent;
       btn.textContent = "PDF 만드는 중…";
       try {
+        // 클립보드 복사를 먼저: iOS Safari는 buildPdf await 이후 제스처 활성화가 만료됨
+        const copied = await copyText(pkg.promptMd);
         const safe = title.replace(/[^\p{L}\p{N}._-]+/gu, "_").slice(0, 40);
         const name = `독서캡처-${safe}-${scope === "session" ? "세션" : "책"}.pdf`;
         const blob = await buildPdf(ctx);
         const file = { name, blob };
         if (canShareFiles([file])) {
-          const r = await shareFiles([file], `독서 캡처 — ${title}`);
+          const r = await shareFiles([file], `독서 캡처 — ${title}`, pkg.promptMd);
           if (r === "shared") {
             await markExported(caps);
-            flash("공유했어요");
+            flash(copied ? "공유했어요 · 프롬프트 복사됨 — 붙여넣고 보내세요" : "공유했어요");
           } else if (r === "unsupported") {
             downloadFile(file);
-            flash("PDF를 내려받아요");
+            flash(copied ? "PDF 내려받음 · 프롬프트 복사됨 — 붙여넣으세요" : "PDF를 내려받아요");
           } else if (r !== "cancelled") {
             flash("공유 중 문제가 생겼어요");
           }
         } else {
           downloadFile(file);
           await markExported(caps);
-          flash("PDF를 내려받아요");
+          flash(copied ? "PDF 내려받음 · 프롬프트 복사됨 — 붙여넣으세요" : "PDF를 내려받아요");
         }
       } catch (e) {
         console.error("buildPdf failed", e);
