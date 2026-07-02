@@ -46,7 +46,7 @@ export function mountDetail(
         <div class="topbar__t">캡처</div>
       </div>
 
-      <div class="detail__photo ${cap.image ? "" : "detail__photo--none"}">${cap.image ? "" : "📝"}</div>
+      ${cap.image ? `<img class="detail__photoimg" alt="" />` : `<div class="detail__photo--none">📝</div>`}
 
       <div class="card">
         <div class="card__h">한 가지 태그를 고르세요</div>
@@ -80,13 +80,10 @@ export function mountDetail(
     </div>`;
 
     if (cap.image) {
+      const photoEl = root.querySelector(".detail__photoimg") as HTMLImageElement;
       const u = URL.createObjectURL(cap.image);
       urls.push(u);
-      (root.querySelector(".detail__photo") as HTMLElement).style.backgroundImage = `url(${u})`;
-    }
-
-    const photoEl = root.querySelector(".detail__photo") as HTMLElement;
-    if (cap.image) {
+      photoEl.src = u;
       photoEl.title = "탭하면 확대";
       photoEl.setAttribute("aria-label", "탭하면 확대");
       photoEl.onclick = () => {
@@ -102,7 +99,7 @@ export function mountDetail(
             if (lastCropUrl) URL.revokeObjectURL(lastCropUrl);
             lastCropUrl = u;
             urls.push(u);
-            photoEl.style.backgroundImage = `url(${u})`;
+            photoEl.src = u;
           },
         });
       };
