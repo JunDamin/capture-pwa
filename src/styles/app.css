@@ -977,16 +977,15 @@
 .detail {
   padding-bottom: 88px; /* 하단 고정 저장 버튼 공간 */
 }
-.detail__photo {
-  width: 100%;
-  max-height: 56vh;
-  aspect-ratio: 4 / 3;
-  background: var(--surface);
-  background-size: contain;
-  background-position: center;
-  background-repeat: no-repeat;
-  border-radius: var(--r-card);
-  margin: 4px 0 16px;
+.detail__photoimg {
+  display: block;
+  max-width: 100%;
+  max-height: 30vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 12px;
+  margin: 4px auto 12px;
   cursor: pointer;
 }
 .detail__photo--none {
@@ -994,7 +993,11 @@
   align-items: center;
   justify-content: center;
   font-size: 40px;
+  width: 100%;
   aspect-ratio: 16 / 9;
+  background: var(--surface);
+  border-radius: var(--r-card);
+  margin: 4px 0 16px;
 }
 .tagpills {
   display: flex;
@@ -1118,11 +1121,9 @@
     justify-content: flex-end;
     max-width: 200px;
   }
-  /* 상세 사진: 가로 이미지가 잘리지 않게 contain 유지하되 높이 확보 */
-  .detail__photo {
+  /* 상세 사진: 가로모드에선 높이 여유 — 크게 보여줌 */
+  .detail__photoimg {
     max-height: 70vh;
-    aspect-ratio: auto;
-    min-height: 200px;
   }
 }
 
