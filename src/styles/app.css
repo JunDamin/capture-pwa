@@ -225,31 +225,6 @@
   background: #e5e8eb;
   margin: 0 auto 18px;
 }
-.chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 9px;
-  margin-bottom: 14px;
-}
-.chip {
-  background: var(--surface);
-  border-radius: 999px;
-  padding: 11px 16px;
-  font-size: 15px;
-  font-weight: 600;
-  color: var(--ink);
-  transition: transform 0.15s var(--spring);
-}
-.chip:active {
-  transform: scale(0.95);
-}
-.chip.is-sel {
-  background: #e7f0fe;
-  color: var(--primary);
-}
-.chip.chip--write {
-  color: var(--sub);
-}
 .btn-primary {
   width: 100%;
   min-height: 56px;
@@ -570,12 +545,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.bookmeta {
-  font-size: 14px;
-  color: var(--sub);
-  font-weight: 500;
-  margin-top: 4px;
-}
 .sessionchip {
   display: inline-flex;
   align-items: center;
@@ -592,9 +561,6 @@
   height: 7px;
   border-radius: 50%;
   background: var(--primary);
-}
-.dot--off {
-  background: #c4ccd4;
 }
 .chev {
   color: #c4ccd4;
@@ -796,20 +762,6 @@
   border-radius: 999px;
 }
 .toBookExport { margin-top: 8px; }
-.danger-link {
-  display: block;
-  width: 100%;
-  margin: 24px auto 8px;
-  padding: 12px;
-  min-height: 48px;
-  background: none;
-  border: none;
-  color: var(--sub);
-  font-size: 14px;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
 .srow {
   display: flex;
   justify-content: space-between;
@@ -827,9 +779,6 @@
 }
 .srow.muted {
   color: var(--sub);
-}
-.srow.warn {
-  color: #d98300;
 }
 
 .caplist {
@@ -1016,12 +965,6 @@
 .tagpill.is-sel {
   background: var(--primary);
   color: #fff;
-}
-.detail__q {
-  font-size: 18px;
-  font-weight: 700;
-  color: var(--ink);
-  margin-bottom: 12px;
 }
 .detail__pagerow {
   display: flex;

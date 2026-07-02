@@ -101,6 +101,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
             flash(copied ? "공유했어요 · 프롬프트 복사됨 — 붙여넣고 보내세요" : "공유했어요");
           } else if (r === "unsupported") {
             downloadFile(file);
+            await markExported(caps);
             flash(copied ? "PDF 내려받음 · 프롬프트 복사됨 — 붙여넣으세요" : "PDF를 내려받아요");
           } else if (r !== "cancelled") {
             flash("공유 중 문제가 생겼어요");

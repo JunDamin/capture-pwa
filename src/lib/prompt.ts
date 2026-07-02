@@ -17,7 +17,6 @@ export interface ExportContext {
 
 export interface ExportPackage {
   promptMd: string;
-  files: { name: string; blob: Blob }[]; // prompt.md + capture-NN.jpg
   imageCount: number;
 }
 
@@ -35,17 +34,11 @@ function pad(i: number) {
 
 export function buildExport(ctx: ExportContext): ExportPackage {
   const { captures } = ctx;
-  const files: { name: string; blob: Blob }[] = [];
 
-  // 캡처별 본문 + 이미지 파일 수집
+  // 캡처별 본문 (사진은 capture-NN 파일명 텍스트로만 참조)
   const blocks = captures.map((c, i) => {
     const tag = tagMeta(c.tag);
-    let imgLine = "사진 없음";
-    if (c.image) {
-      const name = `capture-${pad(i)}.jpg`;
-      files.push({ name, blob: c.image });
-      imgLine = `${name} (첨부)`;
-    }
+    const imgLine = c.image ? `capture-${pad(i)}.jpg (첨부)` : "사진 없음";
     const note = [c.memo, c.why].filter((s) => s && s.trim()).join(" · ") || null; // 레거시 why 합치기
     const lines = [
       `### capture-${pad(i)} · ${tag.emoji} ${tag.label} · ${fmtTime(c.createdAt)}${c.page ? ` · p.${c.page}` : ""}`,
@@ -104,8 +97,5 @@ ${blocks.join("\n\n")}
 ${tagDist || "(없음)"}
 `;
 
-  // prompt.md를 파일 목록 맨 앞에
-  files.unshift({ name: "prompt.md", blob: new Blob([md], { type: "text/markdown" }) });
-
-  return { promptMd: md, files, imageCount: captures.filter((c) => c.image).length };
+  return { promptMd: md, imageCount: captures.filter((c) => c.image).length };
 }

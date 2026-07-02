@@ -110,8 +110,8 @@ export async function deleteCapture(id: string) {
   await (await db()).delete("captures", id);
 }
 
-/** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. */
-export async function deleteSession(sessionId: string): Promise<void> {
+/** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. (deleteBook 내부 전용) */
+async function deleteSession(sessionId: string): Promise<void> {
   const caps = await capturesForSession(sessionId);
   const d = await db();
   for (const c of caps) await d.delete("captures", c.uuid);
@@ -146,11 +146,6 @@ export async function capturesForBook(bookId: string): Promise<Capture[]> {
   const all: Capture[] = [];
   for (const s of sessions) all.push(...(await capturesForSession(s.uuid)));
   return all.sort((a, b) => a.createdAt - b.createdAt);
-}
-
-export async function endSession(id: string, endedAt: number) {
-  const s = await getSession(id);
-  if (s && s.ended == null) await putSession({ ...s, ended: endedAt });
 }
 
 /** 그 책의 열린 회독만 종료(다른 책 무관). */

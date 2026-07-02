@@ -4,7 +4,7 @@ const LS_KEY = "capture.cropFrame";
 const DEFAULT_RECT: CropRect = { x: 0.06, y: 0.25, w: 0.88, h: 0.38 };
 const MIN = 0.08;
 
-export function loadCropRect(): CropRect {
+function loadCropRect(): CropRect {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (!raw) return { ...DEFAULT_RECT };

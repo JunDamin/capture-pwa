@@ -303,6 +303,8 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
       const blob: Blob | null = await new Promise((res) =>
         canvas.toBlob((b) => res(b), "image/jpeg", QUALITY),
       );
+      canvas.width = 0;
+      canvas.height = 0; // 백킹스토어 해제(iOS 메모리)
       if (blob) opts.onCrop!(blob, ow, oh);
       close();
     };
