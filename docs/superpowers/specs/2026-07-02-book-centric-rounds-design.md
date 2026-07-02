@@ -20,6 +20,7 @@
   - "다른 책 시작 시 이전 세션 종료" **삭제** — `startNewSession`의 `endAllOpenSessions` 전역 종료를 **그 책의 열린 회독만 종료**로 변경(여러 책 병행 자연스러움).
   - 회독이 닫히는 유일한 경로 = **"새 회독 시작"**(그 책의 이전 회독을 닫고 새 회독 생성).
 - **현재 회독** = 그 책의 세션 중 `ended == null`인 것(레거시로 여럿이면 최근 활동 것 — 정상 흐름에선 책마다 1개).
+- **회독 번호 수정 가능(추가 요구):** `Session.roundNo?: number` 선택 필드(마이그레이션 불필요·백업 호환). **표시 = `roundNo ?? 계산값`**(레거시 부풀림 교정용). 새 회독 생성 시(새 회독 시작·자동 생성) `roundNo = 직전 회독 표시번호 + 1` 저장 → 교정이 이후 번호로 이어짐. 편집은 Review ✎에서 번호+제목 함께.
 - **[핵심 헬퍼(검토 C3)] `currentRoundFor(bookId): Promise<string>`** — get-or-create: 열린 회독 있으면 그 uuid, 없으면 **아무것도 닫지 않고** 새 세션 생성 후 uuid. **모든 📷/✍️ 진입과 공유 수신이 이걸 사용.** `startNewSession`(그 책만 닫고 새로)은 **"새 회독 시작" 버튼 전용**.
 - `startNewSession` 내부의 `endAllOpenSessions`(전역) → `endOpenRoundsForBook(bookId, now)`(그 책만)으로 교체(검토 C1·2). 전역 함수는 미사용화.
 
