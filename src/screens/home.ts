@@ -1,5 +1,6 @@
 /** Home — 최근 책 목록. PRD §8-A, 토스 라이트. */
 import type { Nav } from "../app.ts";
+import { escapeHtml as esc } from "../lib/ui.ts";
 import { recentBooks, currentRoundFor, type BookView } from "../db/db.ts";
 import { isStandalone, promptInstall } from "../lib/install.ts";
 
@@ -164,6 +165,3 @@ function showIosInstallSheet(root: HTMLElement) {
   el.onclick = (ev) => { if (ev.target === el) el.remove(); };
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

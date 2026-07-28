@@ -6,6 +6,7 @@
  * 예산 계측: 웜업 / appMs(shutterMs+saveMs) / humanMs / 압축 / 용량 — HUD 노출 (사진 모드만).
  */
 import type { Nav } from "../app.ts";
+import { escapeHtml as esc, showToast } from "../lib/ui.ts";
 import { startCamera, stopCamera } from "../camera/camera.ts";
 import { cropResizeCompress } from "../lib/image.ts";
 import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
@@ -470,15 +471,10 @@ export function mountCapture(
       done.classList.add("is-show");
     }
 
-    // ---- 저장 토스트 (books/export 패턴) — 연속 저장 시 이전 타이머 리셋 ----
-    const toast = root.querySelector(".toast") as HTMLElement;
-    let toastTimer: ReturnType<typeof setTimeout> | undefined;
+    // ---- 저장 토스트 — 연속 저장 시 이전 타이머 리셋(showToast가 처리) ----
     function flash(msg: string) {
       navigator.vibrate?.(30);
-      toast.textContent = msg;
-      toast.hidden = false;
-      clearTimeout(toastTimer);
-      toastTimer = setTimeout(() => (toast.hidden = true), 3000);
+      showToast(root, msg, 3000);
     }
   }
 
@@ -613,6 +609,3 @@ function template(session: Session, bookTitle: string, startCount: number, initi
   </div>`;
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

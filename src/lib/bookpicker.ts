@@ -1,4 +1,5 @@
 /** 책 선택 바텀시트 — capture(책 전환)/detail(책 바꾸기) 공용. objectURL 자체 관리. */
+import { escapeHtml as esc } from "./ui.ts";
 import { recentBooks } from "../db/db.ts";
 import type { Book } from "../db/types.ts";
 
@@ -49,6 +50,3 @@ export function openBookPicker(opts: {
   })();
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

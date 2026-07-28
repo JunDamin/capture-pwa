@@ -1,5 +1,6 @@
 /** Export — PDF(자료)+클립보드 프롬프트 2채널(ADR-019). 1순위 Web Share, 보조 복사·다운로드. PRD §8-D. */
 import type { Nav, Scope } from "../app.ts";
+import { escapeHtml as esc, showToast } from "../lib/ui.ts";
 import {
   updateCapture,
   capturesForBook,
@@ -72,12 +73,7 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       <div class="toast" hidden></div>
     </div>`;
 
-    const toast = root.querySelector(".toast") as HTMLElement;
-    const flash = (msg: string) => {
-      toast.textContent = msg;
-      toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 2200);
-    };
+    const flash = (msg: string) => showToast(root, msg, 2200);
 
     (root.querySelector(".back") as HTMLElement).onclick = () =>
       nav({ name: "review", scope, id });
@@ -135,6 +131,3 @@ export function mountExport(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   return () => {};
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

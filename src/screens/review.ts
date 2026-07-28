@@ -1,5 +1,6 @@
 /** Review — 규칙 기반 분류 + Export 진입. AI 호출 없음(ADR-007). PRD §8-C. */
 import type { Nav, Scope } from "../app.ts";
+import { escapeHtml as esc, formatTime } from "../lib/ui.ts";
 import {
   capturesForBook,
   capturesForSession,
@@ -163,8 +164,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
 
   function card(c: Capture) {
     const tag = TAGS.find((t) => t.key === c.tag)!;
-    const t = new Date(c.createdAt);
-    const hm = `${String(t.getHours()).padStart(2, "0")}:${String(t.getMinutes()).padStart(2, "0")}`;
+    const hm = formatTime(c.createdAt, "hm");
     return `
     <div class="capcard" data-id="${c.uuid}">
       <div class="capthumb ${c.image ? "" : "capthumb--none"}">${c.image ? "" : "📝"}</div>
@@ -188,6 +188,3 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   return () => urls.forEach((u) => URL.revokeObjectURL(u));
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

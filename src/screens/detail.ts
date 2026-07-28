@@ -1,5 +1,6 @@
 /** 캡처 상세 + 편집 — 큰 사진 + 태그/왜/메모/페이지 수정. PRD §8, ADR-004. */
 import type { Nav, Scope } from "../app.ts";
+import { escapeHtml as esc, formatTime, showToast } from "../lib/ui.ts";
 import { currentRoundFor, getBook, getCapture, getSession, updateCapture } from "../db/db.ts";
 import { TAGS, isValidCapture, type Book, type Capture, type Tag } from "../db/types.ts";
 import { openBookPicker } from "../lib/bookpicker.ts";
@@ -36,9 +37,7 @@ export function mountDetail(
         `<button class="tagpill ${t.key === tag ? "is-sel" : ""}" data-tag="${t.key}">${t.emoji} ${t.label}</button>`,
     ).join("");
 
-    const d = new Date(cap.createdAt);
-    const p = (n: number) => String(n).padStart(2, "0");
-    const stamp = `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+    const stamp = formatTime(cap.createdAt, "date");
 
     root.innerHTML = `
     <div class="scr scr--light detail">
@@ -109,11 +108,9 @@ export function mountDetail(
     (root.querySelector(".back") as HTMLElement).onclick = back;
 
     const flash = (msg: string) => {
-      const toast = root.querySelector(".toast") as HTMLElement | null;
-      if (!toast) return; // 화면 이탈 후 늦은 응답 — 무시
-      toast.textContent = msg;
-      toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 2400);
+      // 화면 이탈 후 늦은 응답 — 무시(root가 다시 렌더된 뒤 stray 토스트 방지)
+      if (!root.querySelector(".toast")) return;
+      showToast(root, msg, 2400);
     };
 
     // 책 바꾸기 — 캡처를 선택한 책의 현재 회독으로 이동
@@ -172,6 +169,3 @@ export function mountDetail(
   };
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}

@@ -5,6 +5,7 @@
  * 서로를 참조하므로 번호 매김이 반드시 lockstep이어야 한다.
  */
 import { TAGS, type Capture } from "../db/types.ts";
+import { formatTime } from "./ui.ts";
 
 export interface CaptureRow {
   num: string; // "01" (padStart 2)
@@ -23,13 +24,6 @@ export function captureNote(c: Capture): string | null {
   return [c.memo, c.why].filter((s) => s && s.trim()).join(" · ") || null;
 }
 
-/** 시각 포맷 YYYY-MM-DD HH:mm. (T2에서 공용 util로 교체 예정 — 현재 자립) */
-function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
 export function captureRows(captures: Capture[]): CaptureRow[] {
   return captures.map((c, i) => {
     const num = String(i + 1).padStart(2, "0");
@@ -40,7 +34,7 @@ export function captureRows(captures: Capture[]): CaptureRow[] {
       fileName: `capture-${num}.jpg`,
       tagEmoji: tag.emoji,
       tagLabel: tag.label,
-      time: fmtTime(c.createdAt),
+      time: formatTime(c.createdAt, "full"),
       passage,
       note: captureNote(c),
       page: c.page ?? null,

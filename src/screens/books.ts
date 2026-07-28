@@ -1,5 +1,6 @@
 /** 책장 — 책 목록·새 책 등록(등록 직후 첫 회독 시작). PRD §8-A, ADR-005/006/016. */
 import type { Nav } from "../app.ts";
+import { escapeHtml as esc, showToast } from "../lib/ui.ts";
 import {
   capturesForBook,
   currentRoundFor,
@@ -50,12 +51,7 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
       <div class="toast" hidden></div>
     </div>`;
 
-    if (toastMsg) {
-      const toast = root.querySelector(".toast") as HTMLElement;
-      toast.textContent = toastMsg;
-      toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 2400);
-    }
+    if (toastMsg) showToast(root, toastMsg, 2400);
 
     (root.querySelector(".back") as HTMLElement).onclick = () => nav({ name: "home" });
 
@@ -180,11 +176,9 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
     </div>`;
 
     const flash = (msg: string) => {
-      const toast = root.querySelector(".toast") as HTMLElement | null;
-      if (!toast) return; // 화면 이탈 후 늦은 응답 — 무시
-      toast.textContent = msg;
-      toast.hidden = false;
-      setTimeout(() => (toast.hidden = true), 2400);
+      // 화면 이탈 후 늦은 응답 — 무시(root가 다시 렌더된 뒤 stray 토스트 방지)
+      if (!root.querySelector(".toast")) return;
+      showToast(root, msg, 2400);
     };
 
     (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
@@ -297,6 +291,3 @@ function bookRow(b: Book, urls: string[]) {
   </div>`;
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}
