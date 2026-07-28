@@ -1,7 +1,8 @@
 /** 요약 표지 + 사진을 단일 PDF로(자료 전용 — 지시문은 클립보드 프롬프트가 담당). 한글은 canvas 렌더(Pretendard) — jsPDF 폰트 임베딩 회피. ADR-008. */
 import { jsPDF } from "jspdf";
 import type { ExportContext } from "./prompt.ts";
-import { TAGS, type Capture } from "../db/types.ts";
+import type { Capture } from "../db/types.ts";
+import { captureRows } from "./exportModel.ts";
 
 const W = 1240;
 const H = 1754;
@@ -53,12 +54,6 @@ function wrap(g: CanvasRenderingContext2D, text: string, maxW: number): string[]
     out.push(line);
   }
   return out;
-}
-
-function fmtTime(ts: number): string {
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 /**
@@ -135,13 +130,14 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   }
   addPage(pg.c);
 
-  // --- 사진 페이지: 사진 있는 캡처마다 ---
+  // --- 사진 페이지: 사진 있는 캡처마다 (번호·태그·시각·note는 exportModel로 파생 — prompt.md와 lockstep) ---
+  const rows = captureRows(captures);
   for (let i = 0; i < captures.length; i++) {
     const cap: Capture = captures[i];
     if (!cap.image) continue;
+    const row = rows[i];
     const p = blank();
-    const num = `capture-${String(i + 1).padStart(2, "0")}`;
-    const tag = TAGS.find((t) => t.key === cap.tag)!;
+    const num = `capture-${row.num}`;
     p.g.fillStyle = INK;
     p.g.font = "700 34px Pretendard";
     p.g.fillText(num, M, M);
@@ -173,25 +169,24 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
     let cy = M + 70 + availH + 24;
     p.g.fillStyle = INK;
     p.g.font = "600 30px Pretendard";
-    p.g.fillText(`${tag.emoji} ${tag.label}`, M, cy);
+    p.g.fillText(`${row.tagEmoji} ${row.tagLabel}`, M, cy);
     cy += 44;
     p.g.fillStyle = SUB;
     p.g.font = "400 26px Pretendard";
-    const meta = [fmtTime(cap.createdAt), cap.page ? `p.${cap.page}` : null]
+    const meta = [row.time, row.page ? `p.${row.page}` : null]
       .filter(Boolean)
       .join("  ·  ");
     p.g.fillText(meta, M, cy);
     cy += 40;
     p.g.fillStyle = INK;
-    const note = [cap.memo, cap.why].filter((s) => s && s.trim()).join(" · ");
-    if (cap.passage && cap.passage.trim()) {
-      for (const ln of wrap(p.g, `담은 글: ${cap.passage.trim()}`, W - M * 2)) {
+    if (row.passage) {
+      for (const ln of wrap(p.g, `담은 글: ${row.passage}`, W - M * 2)) {
         p.g.fillText(ln, M, cy);
         cy += 36;
       }
     }
-    if (note) {
-      for (const ln of wrap(p.g, `내 생각: ${note}`, W - M * 2)) {
+    if (row.note) {
+      for (const ln of wrap(p.g, `내 생각: ${row.note}`, W - M * 2)) {
         p.g.fillText(ln, M, cy);
         cy += 36;
       }

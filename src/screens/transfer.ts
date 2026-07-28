@@ -1,5 +1,6 @@
 /** 백업·설정 — 전체 데이터를 단일 JSON으로 내보내고/복원 + 앱 설정. */
 import type { Nav } from "../app.ts";
+import { escapeHtml as esc, showToast } from "../lib/ui.ts";
 import { buildBackup, importBackup } from "../lib/backup.ts";
 import { downloadFile } from "../lib/share.ts";
 import { getTtbKey, setTtbKey } from "../lib/aladin.ts";
@@ -35,12 +36,7 @@ export function mountTransfer(root: HTMLElement, nav: Nav): () => void {
     <div class="toast" hidden></div>
   </div>`;
 
-  const toast = root.querySelector(".toast") as HTMLElement;
-  const flash = (msg: string) => {
-    toast.textContent = msg;
-    toast.hidden = false;
-    setTimeout(() => (toast.hidden = true), 2400);
-  };
+  const flash = (msg: string) => showToast(root, msg, 2400);
 
   (root.querySelector(".back") as HTMLElement).onclick = () => nav({ name: "home" });
 
@@ -84,6 +80,3 @@ export function mountTransfer(root: HTMLElement, nav: Nav): () => void {
   return () => {};
 }
 
-function esc(s: string) {
-  return s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);
-}
