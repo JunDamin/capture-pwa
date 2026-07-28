@@ -7,7 +7,8 @@ export interface ViewerOptions {
   onCrop?: (blob: Blob, width: number, height: number) => void;
 }
 
-export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
+/** 뷰어를 연다. 반환값은 닫기 핸들(idempotent) — 소유 화면 cleanup에서 호출해 잔류 오버레이 방지. */
+export function openImageViewer(image: Blob, opts: ViewerOptions = {}): () => void {
   const url = URL.createObjectURL(image);
   const overlay = document.createElement("div");
   overlay.className = "viewer";
@@ -321,4 +322,6 @@ export function openImageViewer(image: Blob, opts: ViewerOptions = {}): void {
     close();
   };
   imgEl.src = url;
+
+  return close;
 }

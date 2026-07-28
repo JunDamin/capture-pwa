@@ -3,16 +3,20 @@ import { escapeHtml as esc } from "./ui.ts";
 import { recentBooks } from "../db/db.ts";
 import type { Book } from "../db/types.ts";
 
+/** 책 선택 시트를 연다. 반환값은 닫기 핸들(idempotent) — 소유 화면 cleanup에서 호출해 잔류 시트 방지. */
 export function openBookPicker(opts: {
   currentBookId?: string;
   onPick: (book: Book) => void | Promise<void>;
-}): void {
+}): () => void {
   const urls: string[] = [];
+  let closed = false;
   const el = document.createElement("div");
   el.className = "bookpick";
   el.innerHTML = `<div class="bookpick__card"><div class="bookpick__t">책 선택</div><div class="bookpick__list"><div class="loading">불러오는 중…</div></div></div>`;
   document.body.appendChild(el);
   const dismiss = () => {
+    if (closed) return;
+    closed = true;
     urls.forEach((u) => URL.revokeObjectURL(u));
     urls.length = 0;
     el.remove();
@@ -48,5 +52,7 @@ export function openBookPicker(opts: {
       };
     });
   })();
+
+  return dismiss;
 }
 

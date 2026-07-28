@@ -14,6 +14,7 @@ export function mountDetail(
 ): () => void {
   const urls: string[] = [];
   let backTimer: number | null = null; // 저장 후 지연 back 타이머 — cleanup에서 해제
+  let closeOverlay: (() => void) | null = null; // 열린 뷰어/책피커 닫기 핸들 — cleanup에서 잔류 방지
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   // back은 진입한 from 유지 — 책을 바꾼 뒤엔 옛 Review에 이 캡처가 없을 수 있음(의도된 수용).
@@ -88,7 +89,7 @@ export function mountDetail(
       photoEl.setAttribute("aria-label", "탭하면 확대");
       photoEl.onclick = () => {
         if (!cap.image) return;
-        openImageViewer(cap.image, {
+        closeOverlay = openImageViewer(cap.image, {
           onCrop: async (blob, w, h) => {
             cap.image = blob;
             cap.imageW = w;
@@ -116,7 +117,7 @@ export function mountDetail(
     // 책 바꾸기 — 캡처를 선택한 책의 현재 회독으로 이동
     const bookNameEl = root.querySelector(".detail__book") as HTMLElement;
     (root.querySelector(".bookchange") as HTMLButtonElement).onclick = () =>
-      openBookPicker({
+      (closeOverlay = openBookPicker({
         currentBookId: book?.uuid,
         onPick: async (b) => {
           cap.sessionId = await currentRoundFor(b.uuid);
@@ -126,7 +127,7 @@ export function mountDetail(
           bookNameEl.textContent = `📚 ${b.title}`;
           flash(`『${b.title}』(으)로 옮겼어요`);
         },
-      });
+      }));
 
     const passageEl = root.querySelector(".detail__passage") as HTMLTextAreaElement;
     const memo = root.querySelector(".detail__memo") as HTMLTextAreaElement;
@@ -165,6 +166,8 @@ export function mountDetail(
 
   return () => {
     if (backTimer != null) clearTimeout(backTimer); // 이탈 후 지연 back이 사용자를 끌고가지 않게
+    closeOverlay?.(); // 열린 뷰어/책피커 정리(idempotent)
+    closeOverlay = null;
     urls.forEach((u) => URL.revokeObjectURL(u));
   };
 }

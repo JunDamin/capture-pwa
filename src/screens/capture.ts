@@ -37,6 +37,7 @@ export function mountCapture(
 
   let cropFrame: CropFrame | null = null;
   let pendingUrl: string | null = null; // 편집 시트 사진 objectURL — cleanup에서도 revoke
+  let closeOverlay: (() => void) | null = null; // 열린 뷰어/책피커 닫기 핸들 — cleanup에서 잔류 방지
 
   (async () => {
     const session = await getSession(sessionId);
@@ -189,7 +190,7 @@ export function mountCapture(
     const pillTitle = root.querySelector(".pill__title") as HTMLElement;
     pillTitle.onclick = () => {
       if (currentMode !== "input") return; // 사진 모드 불변(3초 루프)
-      openBookPicker({
+      closeOverlay = openBookPicker({
         currentBookId: session.bookId,
         onPick: async (book) => {
           const sid = await currentRoundFor(book.uuid);
@@ -317,7 +318,7 @@ export function mountCapture(
     // 사진 탭 → 전체화면 뷰어(재크롭) — detail.ts와 동일 패턴, 뷰어는 body 부착(z1000, 시트 위)
     edImg.onclick = () => {
       if (!pendingPhoto) return;
-      openImageViewer(pendingPhoto.blob, {
+      closeOverlay = openImageViewer(pendingPhoto.blob, {
         onCrop: (blob, w, h) => {
           pendingPhoto = { ...pendingPhoto!, blob, width: w, height: h };
           setEditorPhoto(blob); // objectURL 교체(이전 revoke)
@@ -483,6 +484,8 @@ export function mountCapture(
     stopCamera();
     cropFrame?.destroy();
     cropFrame = null;
+    closeOverlay?.(); // 열린 뷰어/책피커 정리(idempotent)
+    closeOverlay = null;
     if (pendingUrl) {
       URL.revokeObjectURL(pendingUrl);
       pendingUrl = null;
