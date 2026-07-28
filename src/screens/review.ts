@@ -9,6 +9,7 @@ import {
   getSession,
 } from "../db/db.ts";
 import { TAGS, type Book, type Capture } from "../db/types.ts";
+import { captureNote } from "../lib/exportModel.ts";
 
 export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
   const urls: string[] = [];
@@ -168,7 +169,7 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
     <div class="capcard" data-id="${c.uuid}">
       <div class="capthumb ${c.image ? "" : "capthumb--none"}">${c.image ? "" : "📝"}</div>
       <div class="capbody">
-        <div class="capmeta"><span class="captag">${tag.emoji} ${tag.label}</span> ${esc(c.passage ?? c.memo ?? c.why ?? "—")}</div>
+        <div class="capmeta"><span class="captag">${tag.emoji} ${tag.label}</span> ${esc(c.passage ?? captureNote(c) ?? "—")}</div>
         <div class="captime">${hm}</div>
       </div>
       <button class="capdel" aria-label="삭제">🗑</button>

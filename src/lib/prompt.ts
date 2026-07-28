@@ -4,6 +4,7 @@
  * 첨부 사진과 캡처는 파일명 번호(capture-NN)로 엮인다.
  */
 import { TAGS, type Capture } from "../db/types.ts";
+import { captureRows } from "./exportModel.ts";
 
 export const PROMPT_TEMPLATE_VERSION = "v4";
 
@@ -20,31 +21,17 @@ export interface ExportPackage {
   imageCount: number;
 }
 
-const tagMeta = (k: string) => TAGS.find((t) => t.key === k)!;
-
-function fmtTime(ts: number) {
-  const d = new Date(ts);
-  const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
-
-function pad(i: number) {
-  return String(i + 1).padStart(2, "0");
-}
-
 export function buildExport(ctx: ExportContext): ExportPackage {
   const { captures } = ctx;
 
-  // 캡처별 본문 (사진은 capture-NN 파일명 텍스트로만 참조)
-  const blocks = captures.map((c, i) => {
-    const tag = tagMeta(c.tag);
-    const imgLine = c.image ? `capture-${pad(i)}.jpg (첨부)` : "사진 없음";
-    const note = [c.memo, c.why].filter((s) => s && s.trim()).join(" · ") || null; // 레거시 why 합치기
+  // 캡처별 본문 (사진은 capture-NN 파일명 텍스트로만 참조 — exportModel로 파생)
+  const blocks = captureRows(captures).map((row) => {
+    const imgLine = row.hasImage ? `${row.fileName} (첨부)` : "사진 없음";
     const lines = [
-      `### capture-${pad(i)} · ${tag.emoji} ${tag.label} · ${fmtTime(c.createdAt)}${c.page ? ` · p.${c.page}` : ""}`,
+      `### capture-${row.num} · ${row.tagEmoji} ${row.tagLabel} · ${row.time}${row.page ? ` · p.${row.page}` : ""}`,
     ];
-    if (c.passage && c.passage.trim()) lines.push(`- 담은 글: ${c.passage.trim()}`);
-    if (note) lines.push(`- 내 생각: ${note}`);
+    if (row.passage) lines.push(`- 담은 글: ${row.passage}`);
+    if (row.note) lines.push(`- 내 생각: ${row.note}`);
     lines.push(`- 사진: ${imgLine}`);
     return lines.join("\n");
   });
