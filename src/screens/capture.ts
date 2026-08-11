@@ -7,7 +7,7 @@
  */
 import type { Nav } from "../app.ts";
 import { escapeHtml as esc, showToast } from "../lib/ui.ts";
-import { startCamera, stopCamera } from "../camera/camera.ts";
+import { isCameraLive, resumeCamera, startCamera, stopCamera } from "../camera/camera.ts";
 import { cropResizeCompress } from "../lib/image.ts";
 import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
@@ -48,6 +48,7 @@ export function mountCapture(
   let cropFrame: CropFrame | null = null;
   let pendingUrls: string[] = []; // 편집 시트 사진 objectURL — cleanup에서도 revoke
   let closeOverlay: (() => void) | null = null; // 열린 뷰어/책피커 닫기 핸들 — cleanup에서 잔류 방지
+  let disposeLifecycle: (() => void) | null = null; // 복귀 리스너 해제 — 인메모리 라우터라 누수하면 쌓인다
 
   (async () => {
     const session = await getSession(sessionId);
@@ -122,6 +123,8 @@ export function mountCapture(
     let shutterMs = 0;
     let shotSeq = 0; // 촬영마다 증가 — 늦게 도착한 압축 결과를 자기 슬롯에 되돌려주는 키
     let pendingPhotos: PendingPhoto[] = []; // 최대 MAX_PHOTOS장 (ADR-020)
+    let resuming = false; // 복귀 처리 재진입 가드
+    let liveHint = "책 페이지를 담고 셔터를 누르세요"; // 라이브 상태의 정상 안내문(복귀 후 되돌릴 기준)
     let edChosenTag: Tag | null = null;
     const captureSw = new Stopwatch();
 
@@ -151,13 +154,40 @@ export function mountCapture(
         const { warmupMs } = await startCamera(video);
         cropFrame = mountCropFrame(cam);
         hud.innerHTML = hudChip("warmup", warmupMs, BUDGET.warmupMs);
-        hint.textContent = "책 페이지를 담고 셔터를 누르세요";
+        hint.textContent = liveHint;
       } catch (e) {
         hint.textContent = "카메라를 열 수 없어요. 권한을 확인해 주세요.";
         hud.innerHTML = `<span class="hud__chip over">camera: ${(e as Error).name}</span>`;
       }
     }
 
+    // ---- 백그라운드 복귀 — iOS는 백그라운드에서 트랙을 죽인다(ADR-021) ----
+    async function ensureCameraLive() {
+      if (currentMode !== "photo") return; // 입력 모드는 카메라를 끈 상태
+      if (document.visibilityState !== "visible") return;
+      if (resuming) return;
+      resuming = true;
+      try {
+        const r = await resumeCamera(video);
+        if (r === "restart-needed") {
+          stopCamera();
+          await startCam();
+        } else if (r === "ok") {
+          hint.textContent = liveHint; // 셔터가 띄웠을 수 있는 경고 되돌리기
+        }
+      } finally {
+        resuming = false;
+      }
+    }
+
+    // visibilitychange가 안 뜨는 bfcache 복원 경로까지 덮으려고 pageshow도 함께 건다
+    const onResume = () => void ensureCameraLive();
+    document.addEventListener("visibilitychange", onResume);
+    window.addEventListener("pageshow", onResume);
+    disposeLifecycle = () => {
+      document.removeEventListener("visibilitychange", onResume);
+      window.removeEventListener("pageshow", onResume);
+    };
 
     // ---- Mode switching ----
     async function setMode(m: Mode) {
@@ -249,6 +279,13 @@ export function mountCapture(
     shutter.onclick = () => {
       if (phase !== "live") return;
       if (pendingPhotos.length >= MAX_PHOTOS) return; // 사진 추가 후 이미 2장 (ADR-020)
+      // 백그라운드 복귀 등으로 스트림이 죽었으면 얼어붙은 낡은 프레임을 찍지 않는다 (ADR-021).
+      // 동기 검사만 — 정상 경로에 비동기 대기를 더하지 않는다(shutterMs 불변, ADR-018).
+      if (!isCameraLive(video)) {
+        hint.textContent = "카메라를 다시 켜는 중이에요 — 잠시 후 다시 눌러주세요";
+        void ensureCameraLive();
+        return;
+      }
       captureSw.reset();
       const shutterSw = new Stopwatch();
       // 1) 소스 캔버스 + 셔터 시점 크롭 확정(동기)
@@ -370,7 +407,8 @@ export function mountCapture(
         edPassage.classList.remove("field--err");
         edNote.classList.remove("field--err");
         clearEditorPhotos();
-        hint.textContent = "책 페이지를 담고 셔터를 누르세요"; // 사진 추가 안내 되돌리기
+        liveHint = "책 페이지를 담고 셔터를 누르세요"; // 사진 추가 안내 되돌리기
+        hint.textContent = liveHint;
       }
     }
 
@@ -383,7 +421,8 @@ export function mountCapture(
     // 사진 추가 = 찍은 사진을 그대로 둔 채 시트만 하강 — 다음 셔터가 2장째를 붙이고 시트를 재개 (ADR-020)
     edAdd.onclick = () => {
       closeEditor(false);
-      hint.textContent = "이어지는 페이지를 담고 셔터를 누르세요";
+      liveHint = "이어지는 페이지를 담고 셔터를 누르세요";
+      hint.textContent = liveHint;
     };
 
     renderEditorPhotos(); // 빈 스트립 + 버튼 노출 초기화
@@ -541,6 +580,8 @@ export function mountCapture(
 
   // Cleanup: always stop camera (safe even if camera was never started)
   return () => {
+    disposeLifecycle?.(); // 복귀 리스너 먼저 해제 — 정리 중 재시작이 끼어들지 않게
+    disposeLifecycle = null;
     stopCamera();
     cropFrame?.destroy();
     cropFrame = null;
