@@ -74,3 +74,25 @@ export async function cropResizeCompress(
   canvas.height = 0; // 백킹스토어 해제(iOS 메모리)
   return { blob, width: t.w, height: t.h };
 }
+
+/**
+ * 파일 선택(사진첩/사진 찍기)으로 받은 이미지를 촬영본과 같은 규격으로 정규화 — ADR-020.
+ * 디코드는 Image + onload만 사용한다(iOS에서 createImageBitmap/decode()는 throw — ADR-013).
+ */
+export async function compressImageFile(file: Blob): Promise<CompressResult> {
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const el = new Image();
+      el.onload = () => resolve(el);
+      el.onerror = () => reject(new Error("이미지를 열 수 없음"));
+      el.src = url;
+    });
+    const w = img.naturalWidth;
+    const h = img.naturalHeight;
+    if (!w || !h) throw new Error("이미지 크기를 알 수 없음");
+    return await cropResizeCompress(img, w, h, { sx: 0, sy: 0, sw: w, sh: h });
+  } finally {
+    URL.revokeObjectURL(url);
+  }
+}

@@ -9,7 +9,7 @@ import {
   getBook,
   getSession,
 } from "../db/db.ts";
-import { TAGS, type Book, type Capture } from "../db/types.ts";
+import { TAGS, capturePhotos, type Book, type Capture } from "../db/types.ts";
 import { captureNote } from "../lib/exportModel.ts";
 
 export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: string): () => void {
@@ -165,9 +165,11 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
   function card(c: Capture) {
     const tag = TAGS.find((t) => t.key === c.tag)!;
     const hm = formatTime(c.createdAt, "hm");
+    // 썸네일은 대표(첫 장)만 — 2장이면 뱃지로만 알린다(목록에서 objectURL을 배로 늘리지 않음)
+    const n = capturePhotos(c).length;
     return `
     <div class="capcard" data-id="${c.uuid}">
-      <div class="capthumb ${c.image ? "" : "capthumb--none"}">${c.image ? "" : "📝"}</div>
+      <div class="capthumb ${n ? "" : "capthumb--none"}">${n ? "" : "📝"}${n > 1 ? `<span class="capthumb__n" aria-label="사진 ${n}장">${n}</span>` : ""}</div>
       <div class="capbody">
         <div class="capmeta"><span class="captag">${tag.emoji} ${tag.label}</span> ${esc(c.passage ?? captureNote(c) ?? "—")}</div>
         <div class="captime">${hm}</div>

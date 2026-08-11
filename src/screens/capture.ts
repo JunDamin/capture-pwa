@@ -12,7 +12,15 @@ import { cropResizeCompress } from "../lib/image.ts";
 import { mountCropFrame, type CropFrame } from "../lib/cropframe.ts";
 import { BUDGET, Stopwatch, record, within } from "../lib/budget.ts";
 import { addCapture, countCaptures, currentRoundFor, getBook, getSession, uuid } from "../db/db.ts";
-import { TAGS, isValidCapture, type Capture, type Session, type Tag } from "../db/types.ts";
+import {
+  MAX_PHOTOS,
+  TAGS,
+  isValidCapture,
+  photoSlots,
+  type Capture,
+  type Session,
+  type Tag,
+} from "../db/types.ts";
 import { consumeSharedText } from "../lib/install.ts";
 import { openBookPicker } from "../lib/bookpicker.ts";
 import { openImageViewer } from "../lib/viewer.ts";
@@ -20,8 +28,10 @@ import { openImageViewer } from "../lib/viewer.ts";
 type Phase = "live" | "editing";
 type Mode = "photo" | "input";
 
+/** 촬영 1장. 압축이 끝나기 전에는 blob이 null인 자리표다(seq로 슬롯을 되찾는다). */
 interface PendingPhoto {
-  blob: Blob;
+  seq: number;
+  blob: Blob | null;
   width: number;
   height: number;
   compressMs: number;
@@ -36,7 +46,7 @@ export function mountCapture(
   root.innerHTML = `<div class="cam"><div class="cam__boot">준비 중…</div></div>`;
 
   let cropFrame: CropFrame | null = null;
-  let pendingUrl: string | null = null; // 편집 시트 사진 objectURL — cleanup에서도 revoke
+  let pendingUrls: string[] = []; // 편집 시트 사진 objectURL — cleanup에서도 revoke
   let closeOverlay: (() => void) | null = null; // 열린 뷰어/책피커 닫기 핸들 — cleanup에서 잔류 방지
 
   (async () => {
@@ -70,9 +80,10 @@ export function mountCapture(
 
     // ---- Editor sheet elements (촬영 후 편집 시트) ----
     const edsheet = root.querySelector(".edsheet") as HTMLElement;
-    const edImg = root.querySelector(".ed__photoimg") as HTMLImageElement;
+    const edStrip = root.querySelector(".ed__strip") as HTMLElement;
     const edPh = root.querySelector(".ed__photoph") as HTMLElement;
     const edRetake = root.querySelector(".ed__retake") as HTMLButtonElement;
+    const edAdd = root.querySelector(".ed__add") as HTMLButtonElement;
     const edHint = root.querySelector(".ed__hint") as HTMLElement;
     const edPassage = root.querySelector(".ed__passage") as HTMLTextAreaElement;
     const edNote = root.querySelector(".ed__note") as HTMLTextAreaElement;
@@ -109,8 +120,8 @@ export function mountCapture(
     let phase: Phase = "live";
     let count = startCount;
     let shutterMs = 0;
-    let shotSeq = 0; // 다시 찍기/초기화 이후 늦게 도착한 압축 결과 폐기용
-    let pendingPhoto: PendingPhoto | null = null;
+    let shotSeq = 0; // 촬영마다 증가 — 늦게 도착한 압축 결과를 자기 슬롯에 되돌려주는 키
+    let pendingPhotos: PendingPhoto[] = []; // 최대 MAX_PHOTOS장 (ADR-020)
     let edChosenTag: Tag | null = null;
     const captureSw = new Stopwatch();
 
@@ -146,6 +157,7 @@ export function mountCapture(
         hud.innerHTML = `<span class="hud__chip over">camera: ${(e as Error).name}</span>`;
       }
     }
+
 
     // ---- Mode switching ----
     async function setMode(m: Mode) {
@@ -236,6 +248,7 @@ export function mountCapture(
     // ---- Shutter: 크롭·압축 킥오프 + 편집 시트 상승 ----
     shutter.onclick = () => {
       if (phase !== "live") return;
+      if (pendingPhotos.length >= MAX_PHOTOS) return; // 사진 추가 후 이미 2장 (ADR-020)
       captureSw.reset();
       const shutterSw = new Stopwatch();
       // 1) 소스 캔버스 + 셔터 시점 크롭 확정(동기)
@@ -244,45 +257,96 @@ export function mountCapture(
       canvas.height = video.videoHeight;
       canvas.getContext("2d")?.drawImage(video, 0, 0);
       const cropPx = computeCropPx(canvas);
-      // 2) 압축 킥오프(비동기 — 시트 상승 애니메이션과 병행)
+      // 2) 압축 킥오프(비동기 — 시트 상승 애니메이션과 병행). 자리표를 먼저 꽂고 seq로 되찾는다.
       const seq = ++shotSeq;
+      pendingPhotos.push({ seq, blob: null, width: 0, height: 0, compressMs: 0 });
       const compSw = new Stopwatch();
       void cropResizeCompress(canvas, canvas.width, canvas.height, cropPx)
         .then(({ blob, width, height }) => {
           canvas.width = 0;
           canvas.height = 0; // iOS 캔버스 메모리 즉시 해제(CLAUDE.md)
-          if (seq !== shotSeq) return; // 다시 찍기/저장 뒤 늦게 도착 — 폐기
-          pendingPhoto = { blob, width, height, compressMs: compSw.stop() };
-          if (phase === "editing") setEditorPhoto(blob); // 늦게 도착해도 시트에 반영
+          const slot = pendingPhotos.find((p) => p.seq === seq);
+          if (!slot) return; // 다시 찍기/삭제/저장으로 슬롯이 사라짐 — 폐기
+          slot.blob = blob;
+          slot.width = width;
+          slot.height = height;
+          slot.compressMs = compSw.stop();
+          renderEditorPhotos(); // 늦게 도착해도 시트에 반영
         })
         .catch(() => {
           canvas.width = 0;
-          canvas.height = 0; // 무사진 강등 — placeholder 유지, 검증은 저장 시 pendingPhoto 기준
+          canvas.height = 0;
+          // 무사진 강등 — 빈 슬롯을 걷어내 "사진 없음"과 같은 상태로 되돌린다
+          pendingPhotos = pendingPhotos.filter((p) => p.seq !== seq);
+          renderEditorPhotos();
         });
       // 3) 시트 상승(동기)
       openEditor();
       shutterMs = shutterSw.stop(); // 셔터 탭 → 시트 상승 시작까지(동기 구간)
     };
 
-    // ---- Editor sheet: photo / open / close ----
-    function setEditorPhoto(blob: Blob) {
-      if (pendingUrl) URL.revokeObjectURL(pendingUrl);
-      pendingUrl = URL.createObjectURL(blob);
-      edImg.src = pendingUrl;
-      edImg.hidden = false;
-      edPh.hidden = true;
+    // ---- Editor sheet: photo strip / open / close ----
+
+    /** 압축이 끝난 사진만 — 표시·검증·저장의 기준. */
+    function readyPhotos(): PendingPhoto[] {
+      return pendingPhotos.filter((p) => p.blob);
     }
 
-    function clearEditorPhoto() {
-      shotSeq += 1; // 진행 중 압축 결과 무효화
-      pendingPhoto = null;
-      if (pendingUrl) {
-        URL.revokeObjectURL(pendingUrl);
-        pendingUrl = null;
-      }
-      edImg.hidden = true;
-      edImg.removeAttribute("src");
-      edPh.hidden = false;
+    /**
+     * 사진 스트립 전체를 다시 그린다 — 슬롯 추가/삭제/재크롭이 모두 이 한 경로로 수렴.
+     * objectURL은 렌더마다 이전 것을 전부 revoke한다.
+     */
+    function renderEditorPhotos() {
+      pendingUrls.forEach((u) => URL.revokeObjectURL(u));
+      pendingUrls = [];
+      edStrip.innerHTML = "";
+      const shots = readyPhotos();
+      shots.forEach((p, i) => {
+        const url = URL.createObjectURL(p.blob!);
+        pendingUrls.push(url);
+        const slot = document.createElement("div");
+        slot.className = "ed__slot";
+        const img = document.createElement("img");
+        img.className = "ed__slotimg";
+        img.alt = "";
+        img.setAttribute("aria-label", `사진 ${i + 1} — 탭하면 확대`);
+        img.src = url;
+        img.onclick = () => openSlotViewer(p);
+        const del = document.createElement("button");
+        del.className = "ed__del";
+        del.type = "button";
+        del.setAttribute("aria-label", `사진 ${i + 1} 삭제`);
+        del.textContent = "×";
+        del.onclick = () => {
+          pendingPhotos = pendingPhotos.filter((x) => x !== p);
+          renderEditorPhotos();
+        };
+        slot.append(img, del);
+        edStrip.append(slot);
+      });
+      edStrip.classList.toggle("ed__strip--two", shots.length > 1);
+      edPh.hidden = shots.length > 0;
+      // 0장: 다시 찍기만 / 1장: 둘 다 / 2장(상한): 삭제로만 되돌린다
+      edRetake.hidden = shots.length >= MAX_PHOTOS;
+      edAdd.hidden = shots.length === 0 || shots.length >= MAX_PHOTOS;
+    }
+
+    /** 슬롯 탭 → 전체화면 뷰어(재크롭) — 그 슬롯만 교체. detail.ts와 동일 패턴. */
+    function openSlotViewer(p: PendingPhoto) {
+      if (!p.blob) return;
+      closeOverlay = openImageViewer(p.blob, {
+        onCrop: (blob, w, h) => {
+          p.blob = blob;
+          p.width = w;
+          p.height = h;
+          renderEditorPhotos();
+        },
+      });
+    }
+
+    function clearEditorPhotos() {
+      pendingPhotos = []; // 진행 중 압축 결과는 슬롯을 못 찾아 자동 폐기
+      renderEditorPhotos();
     }
 
     function openEditor() {
@@ -305,26 +369,24 @@ export function mountCapture(
         edHint.textContent = "한 가지 태그를 고르세요";
         edPassage.classList.remove("field--err");
         edNote.classList.remove("field--err");
-        clearEditorPhoto();
+        clearEditorPhotos();
+        hint.textContent = "책 페이지를 담고 셔터를 누르세요"; // 사진 추가 안내 되돌리기
       }
     }
 
-    // 다시 찍기 = 사진만 폐기 — 입력 텍스트·태그는 보존(다음 셔터에서 시트 재개)
+    // 다시 찍기 = 사진 전부 폐기 — 입력 텍스트·태그는 보존(다음 셔터에서 시트 재개)
     edRetake.onclick = () => {
-      clearEditorPhoto();
+      clearEditorPhotos();
       closeEditor(false);
     };
 
-    // 사진 탭 → 전체화면 뷰어(재크롭) — detail.ts와 동일 패턴, 뷰어는 body 부착(z1000, 시트 위)
-    edImg.onclick = () => {
-      if (!pendingPhoto) return;
-      closeOverlay = openImageViewer(pendingPhoto.blob, {
-        onCrop: (blob, w, h) => {
-          pendingPhoto = { ...pendingPhoto!, blob, width: w, height: h };
-          setEditorPhoto(blob); // objectURL 교체(이전 revoke)
-        },
-      });
+    // 사진 추가 = 찍은 사진을 그대로 둔 채 시트만 하강 — 다음 셔터가 2장째를 붙이고 시트를 재개 (ADR-020)
+    edAdd.onclick = () => {
+      closeEditor(false);
+      hint.textContent = "이어지는 페이지를 담고 셔터를 누르세요";
     };
+
+    renderEditorPhotos(); // 빈 스트립 + 버튼 노출 초기화
 
     // ---- Tag rows (공용 헬퍼) ----
     const edTagEls = wireTagRow(root.querySelector(".ed__tagrow") as HTMLElement, (t) => {
@@ -350,8 +412,9 @@ export function mountCapture(
     async function doEditorSave() {
       const saveSw = new Stopwatch();
       const { passage, note, page } = readForm({ passage: edPassage, note: edNote, page: edPage });
+      const shots = readyPhotos();
       const ok = validate(
-        { hasPhoto: !!pendingPhoto, passage, note, tag: edChosenTag },
+        { hasPhoto: shots.length > 0, passage, note, tag: edChosenTag },
         { passage: edPassage, note: edNote, hint: edHint },
       );
       if (!ok) return;
@@ -361,7 +424,7 @@ export function mountCapture(
         sessionId: session.uuid,
         createdAt: Date.now(),
         updatedAt: Date.now(),
-        image: pendingPhoto?.blob ?? null,
+        ...photoSlots(shots.map((p) => ({ blob: p.blob!, width: p.width, height: p.height }))),
         passage,
         memo: note,
         tag: edChosenTag!,
@@ -369,15 +432,12 @@ export function mountCapture(
         ocr: null,
         exportStatus: "none",
       };
-      if (pendingPhoto) {
-        rec.imageW = pendingPhoto.width;
-        rec.imageH = pendingPhoto.height;
-      }
       if (page) rec.page = page;
 
-      const hadPhoto = !!pendingPhoto;
-      const compressMs = pendingPhoto?.compressMs ?? 0;
-      const sizeKB = pendingPhoto ? pendingPhoto.blob.size / 1024 : 0;
+      const hadPhoto = shots.length > 0;
+      // 압축은 장마다 병렬이므로 체감 지연은 최댓값, 용량은 합계
+      const compressMs = shots.reduce((m, p) => Math.max(m, p.compressMs), 0);
+      const sizeKB = shots.reduce((n, p) => n + p.blob!.size / 1024, 0);
 
       await addCapture(rec);
       const captureMs = captureSw.stop();
@@ -486,10 +546,8 @@ export function mountCapture(
     cropFrame = null;
     closeOverlay?.(); // 열린 뷰어/책피커 정리(idempotent)
     closeOverlay = null;
-    if (pendingUrl) {
-      URL.revokeObjectURL(pendingUrl);
-      pendingUrl = null;
-    }
+    pendingUrls.forEach((u) => URL.revokeObjectURL(u));
+    pendingUrls = [];
   };
 }
 
@@ -589,9 +647,12 @@ function template(session: Session, bookTitle: string, startCount: number, initi
       <div class="grab"></div>
       <div class="edsheet__scroll">
         <div class="ed__photo">
-          <img class="ed__photoimg" alt="" aria-label="탭하면 확대" hidden />
+          <div class="ed__strip"></div>
           <div class="ed__photoph">📷</div>
-          <button class="btn-ghost ed__retake">다시 찍기</button>
+          <div class="ed__photobtns">
+            <button class="btn-ghost ed__retake">다시 찍기</button>
+            <button class="btn-ghost ed__add" hidden>사진 추가</button>
+          </div>
         </div>
         <div class="inp__hint ed__hint">한 가지 태그를 고르세요</div>
         <div class="tagrow tagrow--light ed__tagrow">${tags}</div>

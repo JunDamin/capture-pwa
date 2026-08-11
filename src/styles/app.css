@@ -179,11 +179,52 @@
   gap: 10px;
   margin-bottom: 14px;
 }
-.ed__photoimg {
+/* 사진 스트립 — 1장은 크게, 2장(ADR-020)은 나란히 */
+.ed__strip {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.ed__strip:empty {
+  display: none;
+}
+.ed__slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.ed__slotimg {
   max-width: 100%;
   max-height: 30vh;
   object-fit: contain;
   border-radius: 12px;
+}
+.ed__strip--two .ed__slot {
+  flex: 1 1 50%;
+}
+.ed__strip--two .ed__slotimg {
+  width: 100%;
+  max-height: 22vh;
+}
+.ed__del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
+  cursor: pointer;
+}
+.ed__photobtns {
+  display: flex;
+  gap: 8px;
 }
 .ed__photoph {
   width: 100%;
@@ -199,7 +240,8 @@
 .ed__photoph[hidden] {
   display: none;
 }
-.ed__retake {
+.ed__retake,
+.ed__add {
   flex: none;
   min-height: 44px;
   padding: 0 18px;
@@ -814,6 +856,21 @@
 .capthumb--none {
   background: #eef1f4;
 }
+/* 사진 2장(ADR-020) — 대표 썸네일 위 장수 뱃지 */
+.capthumb__n {
+  align-self: flex-end;
+  margin: 0 3px 3px auto;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background: rgb(25 31 40 / 72%);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 16px;
+  text-align: center;
+}
 .capbody {
   flex: 1;
   min-width: 0;
@@ -931,6 +988,52 @@
 .detail {
   padding-bottom: 88px; /* 하단 고정 저장 버튼 공간 */
 }
+/* 사진 스트립 — 1장은 크게, 2장(ADR-020)은 나란히 */
+.detail__photos {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.detail__strip {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+.detail__slot {
+  position: relative;
+  display: flex;
+  min-width: 0;
+}
+.detail__strip--two .detail__slot {
+  flex: 1 1 50%;
+}
+.detail__strip--two .detail__photoimg {
+  width: 100%;
+  max-height: 22vh;
+}
+.detail__del {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #fff;
+  font-size: 22px;
+  line-height: 1;
+  text-shadow: 0 1px 3px rgb(0 0 0 / 60%);
+  cursor: pointer;
+}
+.detail__addphoto {
+  flex: none;
+  min-height: 44px;
+  padding: 0 18px;
+}
 .detail__photoimg {
   display: block;
   max-width: 100%;
@@ -939,7 +1042,7 @@
   height: auto;
   object-fit: contain;
   border-radius: 12px;
-  margin: 4px auto 12px;
+  margin: 4px auto 0;
   cursor: pointer;
 }
 .detail__photo--none {
@@ -1072,6 +1175,9 @@
   /* 상세 사진: 가로모드에선 높이 여유 — 크게 보여줌 */
   .detail__photoimg {
     max-height: 70vh;
+  }
+  .detail__strip--two .detail__photoimg {
+    max-height: 60vh;
   }
 }
 

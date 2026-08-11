@@ -1,12 +1,13 @@
 /**
- * prompt.md 빌더 — ADR-008/009. 버전된 고정 템플릿 v4.
+ * prompt.md 빌더 — ADR-008/009. 버전된 고정 템플릿 v5.
  * 지시문 + 태그 범례 + 구조화된 캡처 데이터 + OCR 지시 + 규칙 분류(ADR-007).
- * 첨부 사진과 캡처는 파일명 번호(capture-NN)로 엮인다.
+ * 첨부 사진과 캡처는 파일명 번호(capture-NN)로 엮인다. 한 캡처에 사진이 2장이면
+ * capture-NNa/capture-NNb로 갈라지며 같은 글이 이어진 것이다(ADR-020).
  */
 import { TAGS, type Capture } from "../db/types.ts";
-import { captureRows } from "./exportModel.ts";
+import { captureRows, totalPhotoCount } from "./exportModel.ts";
 
-export const PROMPT_TEMPLATE_VERSION = "v4";
+export const PROMPT_TEMPLATE_VERSION = "v5";
 
 export interface ExportContext {
   bookTitle: string;
@@ -23,10 +24,17 @@ export interface ExportPackage {
 
 export function buildExport(ctx: ExportContext): ExportPackage {
   const { captures } = ctx;
+  const photoCount = totalPhotoCount(captures);
 
   // 캡처별 본문 (사진은 capture-NN 파일명 텍스트로만 참조 — exportModel로 파생)
   const blocks = captureRows(captures).map((row) => {
-    const imgLine = row.hasImage ? `${row.fileName} (첨부)` : "사진 없음";
+    const names = row.photos.map((p) => p.fileName).join(", ");
+    const imgLine =
+      row.photos.length === 0
+        ? "사진 없음"
+        : row.photos.length === 1
+          ? `${names} (첨부)`
+          : `${names} (첨부 2장 — 같은 글이 이어짐)`;
     const lines = [
       `### capture-${row.num} · ${row.tagEmoji} ${row.tagLabel} · ${row.time}${row.page ? ` · p.${row.page}` : ""}`,
     ];
@@ -50,18 +58,20 @@ export function buildExport(ctx: ExportContext): ExportPackage {
 
 - 범위: ${ctx.scopeLabel}${project}
 - 캡처 수: ${captures.length}
+- 첨부 사진: ${photoCount}장
 - 템플릿: capture-prompt ${PROMPT_TEMPLATE_VERSION}
 
 ## 너에게 (지시)
 
-나는 책을 읽으며 떠오른 생각을 빠르게 캡처했다. 각 캡처에는 **태그**, 책에서 **담은 글(passage)**, **내 생각(note)**, 그리고 첨부 사진이 있을 수 있다. 첨부 사진은 책 페이지다.
+나는 책을 읽으며 떠오른 생각을 빠르게 캡처했다. 각 캡처에는 **태그**, 책에서 **담은 글(passage)**, **내 생각(note)**, 그리고 첨부 사진이 0~2장 있을 수 있다. 첨부 사진은 책 페이지다.
 
 **작업 방식(중요):** 한 번에 다 하려 하지 마라. **이번 응답에서는 1단계(전사)만** 수행한다. 분량이 많으면 여러 응답에 나눠도 된다 — 응답 한도에 가까워지면 끊고 "**계속이라고 입력하면 이어서 전사합니다**"라고 말한 뒤 기다려라. **분량이 많다는 이유로 거부하거나 요약으로 대체하는 것은 금지다.** 전사가 전부 끝나면 "전사 완료 — 계속이라고 입력하면 2단계 분석을 시작합니다"라고 말하고 기다려라.
 
 ### 1단계 — 원문 전사 (이번 응답)
 
 **각 캡처의 원문을 그대로 출력하라.** 이것이 이후 모든 작업의 기초자료다. **요약·의역·생략 금지.**
-- **사진이 있는 캡처:** 사진을 OCR해 **원문 그대로 전사**하라. 허용되는 수정은 오탈자·줄바꿈·잘린 글자 교정뿐 — 문장을 줄이거나 바꾸지 마라.
+- **사진이 있는 캡처:** 각 사진을 순서대로 OCR해 **원문 그대로 전사**하라. 허용되는 수정은 오탈자·줄바꿈·잘린 글자 교정뿐 — 문장을 줄이거나 바꾸지 마라.
+- **사진이 2장인 캡처(\`capture-NNa\`, \`capture-NNb\`):** 같은 글이 페이지를 넘어 이어진 것이다. 두 장을 따로 다루지 말고 **이어 붙여 하나의 원문으로** 전사하라. 페이지 경계에서 끊긴 문장은 자연스럽게 이어라. 출력 제목은 \`capture-NN\` 하나로 쓴다.
 - **담은 글·내 생각:** **한 글자도 바꾸지 말고 그대로 옮겨라.** 내 생각(note)은 요약하지 말고 원문 그대로 쓴다.
 - **사진이 없는 캡처:** 담은 글·내 생각을 그대로 옮긴다. **사진만 있는 캡처:** OCR 전사만.
 각 캡처를 파일명 번호(\`capture-NN\`)로 표시하고, **번호 순서대로 빠짐없이** 전사하라.
@@ -84,5 +94,5 @@ ${blocks.join("\n\n")}
 ${tagDist || "(없음)"}
 `;
 
-  return { promptMd: md, imageCount: captures.filter((c) => c.image).length };
+  return { promptMd: md, imageCount: photoCount };
 }

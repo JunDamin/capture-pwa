@@ -9,8 +9,9 @@ import {
 } from "../db/db.ts";
 import type { Book, Capture, Session } from "../db/types.ts";
 
-interface CaptureBackup extends Omit<Capture, "image"> {
+interface CaptureBackup extends Omit<Capture, "image" | "image2"> {
   image: string | null; // dataURL 또는 null
+  image2?: string | null; // 2장째 dataURL — ADR-020. 구버전 번들엔 없음(→ null 복원)
 }
 interface BookBackup extends Omit<Book, "cover"> {
   cover: string | null; // dataURL 또는 null (ArrayBuffer는 JSON 직렬화 불가)
@@ -47,8 +48,12 @@ export async function buildBackup(now: number): Promise<Blob> {
   }
   const captures: CaptureBackup[] = [];
   for (const c of caps) {
-    const { image, ...rest } = c;
-    captures.push({ ...rest, image: image ? await blobToDataUrl(image) : null });
+    const { image, image2, ...rest } = c;
+    captures.push({
+      ...rest,
+      image: image ? await blobToDataUrl(image) : null,
+      image2: image2 ? await blobToDataUrl(image2) : null,
+    });
   }
   const bundle: BackupBundle = { version: 1, exportedAt: now, books, sessions, captures };
   return new Blob([JSON.stringify(bundle)], { type: "application/json" });
@@ -76,8 +81,12 @@ export async function importBackup(text: string): Promise<ImportResult> {
   }
   for (const s of b.sessions) await putSession(s);
   for (const c of b.captures) {
-    const { image, ...rest } = c;
-    const cap: Capture = { ...(rest as Omit<Capture, "image">), image: image ? await dataUrlToBlob(image) : null };
+    const { image, image2, ...rest } = c;
+    const cap: Capture = {
+      ...(rest as Omit<Capture, "image" | "image2">),
+      image: image ? await dataUrlToBlob(image) : null,
+      image2: image2 ? await dataUrlToBlob(image2) : null,
+    };
     await updateCapture(cap);
   }
   return { books: b.books.length, sessions: b.sessions.length, captures: b.captures.length };

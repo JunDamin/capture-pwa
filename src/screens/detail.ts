@@ -2,9 +2,20 @@
 import type { Nav, Scope } from "../app.ts";
 import { escapeHtml as esc, formatTime, showToast } from "../lib/ui.ts";
 import { currentRoundFor, getBook, getCapture, getSession, updateCapture } from "../db/db.ts";
-import { TAGS, isValidCapture, type Book, type Capture, type Tag } from "../db/types.ts";
+import {
+  MAX_PHOTOS,
+  TAGS,
+  capturePhotos,
+  isValidCapture,
+  photoSlots,
+  type Book,
+  type Capture,
+  type Photo,
+  type Tag,
+} from "../db/types.ts";
 import { openBookPicker } from "../lib/bookpicker.ts";
 import { openImageViewer } from "../lib/viewer.ts";
+import { compressImageFile } from "../lib/image.ts";
 
 export function mountDetail(
   root: HTMLElement,
@@ -12,7 +23,7 @@ export function mountDetail(
   captureId: string,
   from: { scope: Scope; id: string },
 ): () => void {
-  const urls: string[] = [];
+  let photoUrls: string[] = []; // 사진 스트립 objectURL — 렌더마다 교체, cleanup에서 revoke
   let backTimer: number | null = null; // 저장 후 지연 back 타이머 — cleanup에서 해제
   let closeOverlay: (() => void) | null = null; // 열린 뷰어/책피커 닫기 핸들 — cleanup에서 잔류 방지
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
@@ -31,7 +42,6 @@ export function mountDetail(
   function render(cap: Capture, initialBook: Book | null) {
     let book: Book | null = initialBook;
     let tag: Tag = cap.tag;
-    let lastCropUrl: string | null = null;
 
     const tagPills = TAGS.map(
       (t) =>
@@ -47,7 +57,11 @@ export function mountDetail(
         <div class="topbar__t">캡처</div>
       </div>
 
-      ${cap.image ? `<img class="detail__photoimg" alt="" />` : `<div class="detail__photo--none">📝</div>`}
+      <div class="detail__photos">
+        <div class="detail__strip"></div>
+        <button class="btn-ghost detail__addphoto" hidden>사진 추가</button>
+        <input class="detail__file" type="file" accept="image/*" hidden />
+      </div>
 
       <div class="card">
         <div class="card__h">한 가지 태그를 고르세요</div>
@@ -79,32 +93,6 @@ export function mountDetail(
       <button class="btn-primary save">저장</button>
       <div class="toast" hidden></div>
     </div>`;
-
-    if (cap.image) {
-      const photoEl = root.querySelector(".detail__photoimg") as HTMLImageElement;
-      const u = URL.createObjectURL(cap.image);
-      urls.push(u);
-      photoEl.src = u;
-      photoEl.title = "탭하면 확대";
-      photoEl.setAttribute("aria-label", "탭하면 확대");
-      photoEl.onclick = () => {
-        if (!cap.image) return;
-        closeOverlay = openImageViewer(cap.image, {
-          onCrop: async (blob, w, h) => {
-            cap.image = blob;
-            cap.imageW = w;
-            cap.imageH = h;
-            await updateCapture({ ...cap, image: blob, imageW: w, imageH: h, updatedAt: Date.now() });
-            // 상세 썸네일 갱신 — 이전 크롭 URL만 revoke (초기 썸네일은 건드리지 않음)
-            const u = URL.createObjectURL(blob);
-            if (lastCropUrl) URL.revokeObjectURL(lastCropUrl);
-            lastCropUrl = u;
-            urls.push(u);
-            photoEl.src = u;
-          },
-        });
-      };
-    }
 
     (root.querySelector(".back") as HTMLElement).onclick = back;
 
@@ -143,13 +131,104 @@ export function mountDetail(
       };
     });
 
+    // ---- 사진(최대 2장, ADR-020) — 재크롭·삭제·추가는 저장 버튼을 기다리지 않고 즉시 반영 ----
+    const stripEl = root.querySelector(".detail__strip") as HTMLElement;
+    const addPhotoBtn = root.querySelector(".detail__addphoto") as HTMLButtonElement;
+    const fileEl = root.querySelector(".detail__file") as HTMLInputElement;
+
+    async function persistPhotos(shots: Photo[]) {
+      Object.assign(cap, photoSlots(shots), { updatedAt: Date.now() });
+      await updateCapture(cap);
+      renderPhotos();
+    }
+
+    function renderPhotos() {
+      photoUrls.forEach((u) => URL.revokeObjectURL(u));
+      photoUrls = [];
+      stripEl.innerHTML = "";
+      const shots = capturePhotos(cap);
+      if (!shots.length) {
+        const none = document.createElement("div");
+        none.className = "detail__photo--none";
+        none.textContent = "📝";
+        stripEl.append(none);
+      }
+      shots.forEach((p, i) => {
+        const u = URL.createObjectURL(p.blob);
+        photoUrls.push(u);
+        const slot = document.createElement("div");
+        slot.className = "detail__slot";
+        const img = document.createElement("img");
+        img.className = "detail__photoimg";
+        img.alt = "";
+        img.src = u;
+        img.title = "탭하면 확대";
+        img.setAttribute("aria-label", `사진 ${i + 1} — 탭하면 확대`);
+        img.onclick = () => {
+          closeOverlay = openImageViewer(p.blob, {
+            onCrop: async (blob, w, h) => {
+              const next = capturePhotos(cap);
+              next[i] = { blob, width: w, height: h };
+              await persistPhotos(next);
+            },
+          });
+        };
+        const del = document.createElement("button");
+        del.className = "detail__del";
+        del.type = "button";
+        del.setAttribute("aria-label", `사진 ${i + 1} 삭제`);
+        del.textContent = "×";
+        del.onclick = async () => {
+          const rest = capturePhotos(cap).filter((_, j) => j !== i);
+          // 사진을 지워 내용이 하나도 남지 않는 캡처는 만들지 않는다(ADR-014)
+          const draft = {
+            ...photoSlots(rest),
+            passage: passageEl.value.trim() || null,
+            memo: memo.value.trim() || null,
+            tag,
+          };
+          if (!isValidCapture(draft)) {
+            flash("담은 글이나 내 생각, 사진 중 하나는 필요해요");
+            return;
+          }
+          await persistPhotos(rest);
+        };
+        slot.append(img, del);
+        stripEl.append(slot);
+      });
+      stripEl.classList.toggle("detail__strip--two", shots.length > 1);
+      addPhotoBtn.hidden = shots.length >= MAX_PHOTOS;
+    }
+
+    // 상세 화면엔 카메라가 없다 — 파일 입력으로 iOS 네이티브 "사진 찍기 / 보관함" 시트를 띄운다
+    addPhotoBtn.onclick = () => fileEl.click();
+    fileEl.onchange = async () => {
+      const f = fileEl.files?.[0];
+      fileEl.value = ""; // 같은 파일을 다시 고를 수 있게
+      if (!f) return;
+      const shots = capturePhotos(cap);
+      if (shots.length >= MAX_PHOTOS) return;
+      addPhotoBtn.disabled = true;
+      try {
+        const { blob, width, height } = await compressImageFile(f);
+        await persistPhotos([...shots, { blob, width, height }]);
+        flash("사진을 추가했어요");
+      } catch {
+        flash("사진을 불러오지 못했어요");
+      } finally {
+        addPhotoBtn.disabled = false;
+      }
+    };
+
+    renderPhotos();
+
     const saveBtn = root.querySelector(".save") as HTMLButtonElement;
     saveBtn.onclick = async () => {
       const passageVal = passageEl.value.trim() || null;
       const memoVal = memo.value.trim() || null;
       const n = parseInt(pageEl.value, 10);
       const page = Number.isFinite(n) && n > 0 ? n : undefined;
-      if (!isValidCapture({ image: cap.image, passage: passageVal, memo: memoVal, tag })) {
+      if (!isValidCapture({ ...cap, passage: passageVal, memo: memoVal, tag })) {
         // capture 패턴과 통일 — 내용 필드 표시 + 토스트(alert 금지)
         passageEl.focus();
         passageEl.classList.add("field--err");
@@ -168,7 +247,8 @@ export function mountDetail(
     if (backTimer != null) clearTimeout(backTimer); // 이탈 후 지연 back이 사용자를 끌고가지 않게
     closeOverlay?.(); // 열린 뷰어/책피커 정리(idempotent)
     closeOverlay = null;
-    urls.forEach((u) => URL.revokeObjectURL(u));
+    photoUrls.forEach((u) => URL.revokeObjectURL(u));
+    photoUrls = [];
   };
 }
 

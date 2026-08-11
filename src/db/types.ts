@@ -34,9 +34,12 @@ export interface Capture {
   sessionId: string;
   createdAt: number;
   updatedAt: number;
-  image: Blob | null; // ADR-001/003
+  image: Blob | null; // 사진 1장째 — ADR-001/003
   imageW?: number;
   imageH?: number;
+  image2?: Blob | null; // 사진 2장째 — 같은 글이 페이지를 넘어 이어질 때 (ADR-020)
+  image2W?: number;
+  image2H?: number;
   passage: string | null; // 책에서 담고 싶은 글/인용 — image와 함께 "내용" (ADR-014)
   memo: string | null; // note: 내 생각·주석 (why 흡수)
   tag: Tag; // 필수, 단일 — ADR-002/004
@@ -46,10 +49,51 @@ export interface Capture {
   exportStatus: "none" | "exported";
 }
 
-/** 유효성 — ADR-014: (image ‖ passage ‖ memo) + tag. 생각(memo)만 저장하는 것도 1급 경로. */
-export function isValidCapture(c: Pick<Capture, "image" | "passage" | "memo" | "tag">): boolean {
+/** 캡처당 사진 상한 — ADR-020. 슬롯은 image / image2 두 개뿐이다. */
+export const MAX_PHOTOS = 2;
+
+export interface Photo {
+  blob: Blob;
+  width?: number;
+  height?: number;
+}
+
+export type PhotoSlots = Pick<
+  Capture,
+  "image" | "imageW" | "imageH" | "image2" | "image2W" | "image2H"
+>;
+
+/**
+ * 캡처의 사진을 순서대로 배열로 — ADR-020.
+ * 저장은 슬롯 2개(image/image2)지만 소비자는 전부 이 접근자만 쓴다.
+ * 2장이면 [앞 페이지, 뒤 페이지] 순서이며 같은 글이 이어진 것이다.
+ */
+export function capturePhotos(c: Partial<PhotoSlots>): Photo[] {
+  const out: Photo[] = [];
+  if (c.image) out.push({ blob: c.image, width: c.imageW, height: c.imageH });
+  if (c.image2) out.push({ blob: c.image2, width: c.image2W, height: c.image2H });
+  return out;
+}
+
+/** 사진 슬롯을 배열로부터 다시 채운다 — 저장 직전 조립용(빈 슬롯은 null). */
+export function photoSlots(photos: Photo[]): PhotoSlots {
+  const [a, b] = photos.slice(0, MAX_PHOTOS);
+  return {
+    image: a?.blob ?? null,
+    imageW: a?.width,
+    imageH: a?.height,
+    image2: b?.blob ?? null,
+    image2W: b?.width,
+    image2H: b?.height,
+  };
+}
+
+/** 유효성 — ADR-014: (사진 ‖ passage ‖ memo) + tag. 생각(memo)만 저장하는 것도 1급 경로. */
+export function isValidCapture(
+  c: Pick<Capture, "passage" | "memo" | "tag"> & Partial<PhotoSlots>,
+): boolean {
   const hasContent =
-    c.image != null ||
+    capturePhotos(c).length > 0 ||
     (c.passage != null && c.passage.trim() !== "") ||
     (c.memo != null && c.memo.trim() !== "");
   return hasContent && !!c.tag;
