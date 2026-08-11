@@ -42,6 +42,58 @@ export function showToast(root: HTMLElement, msg: string, ms = 2400): void {
 }
 
 /**
+ * 확인 시트 — 네이티브 confirm() 대체. 파괴적 액션 앞에 세운다.
+ * 네이티브 얼럿은 디자인 언어(토스 derived)와 정면으로 어긋나고 문구 통제도 안 된다.
+ * 셸은 install-sheet·bookpicker와 같은 "스크림 + 하단 카드" 패턴.
+ */
+export function confirmSheet(opts: {
+  title: string;
+  body?: string;
+  confirmLabel: string;
+  destructive?: boolean;
+}): Promise<boolean> {
+  return new Promise((resolve) => {
+    const el = document.createElement("div");
+    el.className = "confirm-sheet";
+    el.setAttribute("role", "dialog");
+    el.setAttribute("aria-modal", "true");
+    el.innerHTML = `<div class="confirm-sheet__card">
+      <div class="confirm-sheet__t"></div>
+      ${opts.body ? `<div class="confirm-sheet__s"></div>` : ""}
+      <button class="btn-primary confirm-sheet__ok${opts.destructive ? " is-danger" : ""}"></button>
+      <button class="btn-ghost confirm-sheet__cancel">취소</button>
+    </div>`;
+    // 제목·본문·라벨은 textContent로 — 책 제목 등 사용자 입력이 들어온다
+    (el.querySelector(".confirm-sheet__t") as HTMLElement).textContent = opts.title;
+    if (opts.body) {
+      (el.querySelector(".confirm-sheet__s") as HTMLElement).textContent = opts.body;
+    }
+    const okBtn = el.querySelector(".confirm-sheet__ok") as HTMLButtonElement;
+    okBtn.textContent = opts.confirmLabel;
+
+    let done = false;
+    const close = (v: boolean) => {
+      if (done) return;
+      done = true;
+      document.removeEventListener("keydown", onKey);
+      el.remove();
+      resolve(v);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") close(false);
+    };
+    okBtn.onclick = () => close(true);
+    (el.querySelector(".confirm-sheet__cancel") as HTMLButtonElement).onclick = () => close(false);
+    el.onclick = (ev) => {
+      if (ev.target === el) close(false); // 스크림 탭 = 취소
+    };
+    document.addEventListener("keydown", onKey);
+    document.body.appendChild(el);
+    okBtn.focus();
+  });
+}
+
+/**
  * 시각 포맷.
  *  - "full" → `YYYY-MM-DD HH:mm` (Export/PDF/prompt)
  *  - "date" → `YYYY.MM.DD HH:mm` (detail 스탬프)

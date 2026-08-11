@@ -1,6 +1,6 @@
 /** Review — 규칙 기반 분류 + Export 진입. AI 호출 없음(ADR-007). PRD §8-C. */
 import type { Nav, Scope } from "../app.ts";
-import { escapeHtml as esc, formatTime } from "../lib/ui.ts";
+import { confirmSheet, escapeHtml as esc, formatTime } from "../lib/ui.ts";
 import {
   capturesForBook,
   capturesForSession,
@@ -147,7 +147,13 @@ export function mountReview(root: HTMLElement, nav: Nav, scope: Scope, id: strin
       el.onclick = () => nav({ name: "detail", captureId: c.uuid, from: { scope, id } });
       (el.querySelector(".capdel") as HTMLElement).onclick = async (ev) => {
         ev.stopPropagation();
-        if (!confirm("이 캡처를 삭제할까요?")) return;
+        const ok = await confirmSheet({
+          title: "이 캡처를 삭제할까요?",
+          body: "되돌릴 수 없어요.",
+          confirmLabel: "삭제",
+          destructive: true,
+        });
+        if (!ok) return;
         await deleteCapture(c.uuid);
         const next = caps.filter((x) => x.uuid !== c.uuid);
         render(next);

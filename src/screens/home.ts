@@ -47,9 +47,9 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     <div class="scr scr--light home">
       <h1 class="home__h">내 책</h1>
       ${top}
-      <button class="btn-primary home__start">▶ 독서 시작</button>
       ${rest.length ? `<div class="sectit">다른 책 <button class="home__books-link">책장 →</button></div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
-      ${isStandalone() ? "" : `<button class="home__install">홈 화면에 등록</button>`}
+      <button class="btn-primary home__start">새 책 시작하기</button>
+      ${isStandalone() ? "" : `<button class="home__install">홈 화면에 추가</button>`}
       <button class="home__transfer">백업·설정</button>
       <div class="home__ver">build ${buildLabel()}</div>
     </div>`;
@@ -142,7 +142,7 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     <div class="emptycard">
       <div class="emptycard__emoji">📖</div>
       <div class="emptycard__t">첫 생각을 붙잡아 보세요</div>
-      <div class="emptycard__s">책을 고르면 캡처가 시작됩니다</div>
+      <div class="emptycard__s">책을 추가하면 캡처를 시작할 수 있어요</div>
     </div>`;
   }
 

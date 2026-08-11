@@ -1,6 +1,6 @@
 /** 책장 — 책 목록·새 책 등록(등록 직후 첫 회독 시작). PRD §8-A, ADR-005/006/016. */
 import type { Nav } from "../app.ts";
-import { escapeHtml as esc, showToast } from "../lib/ui.ts";
+import { confirmSheet, escapeHtml as esc, showToast } from "../lib/ui.ts";
 import {
   capturesForBook,
   currentRoundFor,
@@ -38,14 +38,14 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
       <div class="card form">
         <input class="field title" placeholder="책 제목" autocomplete="off" />
         <input class="field author" placeholder="저자 (선택)" autocomplete="off" />
-        <button class="btn-primary add">새 책으로 시작</button>
+        <button class="btn-primary add">새 책 추가</button>
       </div>
 
       ${
         books.length
-          ? `<div class="sectit">내 책</div>
+          ? `<div class="sectit">모든 책</div>
              <div class="recent">${books.map((b) => bookRow(b, urls)).join("")}</div>`
-          : `<div class="hint-empty">아직 등록한 책이 없어요. 위에서 새 책을 추가하세요.</div>`
+          : `<div class="hint-empty">아직 책이 없어요. 제목을 넣고 추가해 보세요.</div>`
       }
 
       <div class="toast" hidden></div>
@@ -101,7 +101,14 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         const id = el.dataset.del!;
         const b = books.find((x) => x.uuid === id);
         const caps = await capturesForBook(id);
-        if (!confirm(`'${b?.title ?? "이 책"}'과 이 책의 모든 기록·캡처 ${caps.length}개가 지워져요. 삭제할까요?`)) return;
+        // 제목은 body로 — 『…』 뒤 조사는 받침에 따라 을/를이 갈려 자동 생성이 틀린다
+        const ok = await confirmSheet({
+          title: "이 책을 삭제할까요?",
+          body: `『${b?.title ?? "이 책"}』의 기록과 캡처 ${caps.length}개가 함께 지워져요. 되돌릴 수 없어요.`,
+          confirmLabel: "삭제",
+          destructive: true,
+        });
+        if (!ok) return;
         await deleteBook(id);
         books = await listBooks();
         renderList();
@@ -123,15 +130,15 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
           chosen!.author ? ` <span class="proj__author">· ${esc(chosen!.author)}</span>` : ""
         }</div>
         <label class="proj__label">왜 이 책을 읽나요? <span class="opt">선택</span></label>
-        <input class="field project" placeholder="목적 (선택)" autocomplete="off" />
-        <div class="proj__hint">목적은 캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
+        <input class="field project" placeholder="예: 지방교육 프로젝트 자료 조사" autocomplete="off" />
+        <div class="proj__hint">캡처 화면 상단에 계속 보이며, AI에게 맥락을 줍니다.</div>
         <label class="proj__label">시작 모드</label>
         <div class="mode-toggle mode-toggle--light proj__modesel">
           <button class="mode-btn mode-btn--photo${selectedMode === "photo" ? " is-active" : ""}" aria-label="사진 모드">📷 사진</button>
           <button class="mode-btn mode-btn--input${selectedMode === "input" ? " is-active" : ""}" aria-label="입력 모드">✍️ 입력</button>
         </div>
-        <button class="btn-primary start">독서 시작</button>
       </div>
+      <button class="btn-primary start">독서 시작</button>
     </div>`;
 
     (root.querySelector(".back") as HTMLElement).onclick = () => renderList();
