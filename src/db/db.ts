@@ -16,20 +16,39 @@ async function blobToBuf(b: Blob): Promise<ArrayBuffer> {
   });
 }
 
+// 사진 슬롯 2개(image/image2 — ADR-020). 슬롯 하나를 처리하는 헬퍼를 슬롯마다 호출한다.
+const PHOTO_SLOTS = [
+  { blob: "image", type: "imageType" },
+  { blob: "image2", type: "image2Type" },
+] as const;
+
 async function toStored(c: Capture): Promise<unknown> {
-  if (c.image instanceof Blob) {
-    const buf = await blobToBuf(c.image);
-    return { ...c, image: buf, imageType: c.image.type || "image/jpeg" };
+  const rec: Record<string, unknown> = { ...c };
+  let changed = false;
+  for (const s of PHOTO_SLOTS) {
+    const v = rec[s.blob];
+    if (v instanceof Blob) {
+      rec[s.blob] = await blobToBuf(v);
+      rec[s.type] = v.type || "image/jpeg";
+      changed = true;
+    }
   }
-  return c; // image null
+  return changed ? rec : c; // 사진 없음 → 원본 그대로
 }
 
 function fromStored(rec: unknown): Capture {
   const r = rec as Record<string, unknown>;
-  if (r && r.image instanceof ArrayBuffer) {
-    return { ...r, image: new Blob([r.image], { type: (r.imageType as string) || "image/jpeg" }) } as Capture;
+  if (!r) return rec as Capture;
+  let out: Record<string, unknown> | null = null;
+  for (const s of PHOTO_SLOTS) {
+    const v = r[s.blob];
+    if (v instanceof ArrayBuffer) {
+      out = out ?? { ...r };
+      out[s.blob] = new Blob([v], { type: (r[s.type] as string) || "image/jpeg" });
+    }
   }
-  return rec as Capture; // 옛 Blob 레코드(Android) 또는 image null → 그대로
+  // 옛 Blob 레코드(Android) 또는 사진 없음 → 그대로. image2 없는 기존 레코드도 무변환 통과.
+  return (out ?? rec) as Capture;
 }
 
 interface CaptureDB extends DBSchema {

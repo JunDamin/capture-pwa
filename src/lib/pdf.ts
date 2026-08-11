@@ -1,8 +1,7 @@
 /** 요약 표지 + 사진을 단일 PDF로(자료 전용 — 지시문은 클립보드 프롬프트가 담당). 한글은 canvas 렌더(Pretendard) — jsPDF 폰트 임베딩 회피. ADR-008. */
 import { jsPDF } from "jspdf";
 import type { ExportContext } from "./prompt.ts";
-import type { Capture } from "../db/types.ts";
-import { captureRows } from "./exportModel.ts";
+import { captureRows, totalPhotoCount } from "./exportModel.ts";
 
 const W = 1240;
 const H = 1754;
@@ -112,7 +111,7 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   const infoLines = [
     `범위: ${ctx.scopeLabel}${ctx.project ? ` · 목적: ${ctx.project}` : ""}`,
     period ? `기간: ${period}` : null,
-    `캡처: ${captures.length}개 (사진 ${captures.filter((c) => c.image).length}장)`,
+    `캡처: ${captures.length}개 (사진 ${totalPhotoCount(captures)}장)`,
   ].filter(Boolean) as string[];
   for (const ln of infoLines) {
     pg.g.fillText(ln, M, y);
@@ -123,83 +122,90 @@ export async function buildPdf(ctx: ExportContext): Promise<Blob> {
   pg.g.font = "400 26px Pretendard";
   const guide =
     "이 PDF는 독서 캡처 사진 모음입니다. 처리 지시는 함께 붙여넣은 메시지를 따르세요. " +
-    "각 사진 페이지의 캡션에 태그·시각·담은 글·내 생각이 있습니다.";
+    "각 사진 페이지의 캡션에 태그·시각·담은 글·내 생각이 있습니다. " +
+    "capture-NNa / capture-NNb로 나뉜 두 페이지는 같은 글이 이어진 것입니다.";
   for (const ln of wrap(pg.g, guide, W - M * 2)) {
     pg.g.fillText(ln, M, y);
     y += 36;
   }
   addPage(pg.c);
 
-  // --- 사진 페이지: 사진 있는 캡처마다 (번호·태그·시각·note는 exportModel로 파생 — prompt.md와 lockstep) ---
-  const rows = captureRows(captures);
-  for (let i = 0; i < captures.length; i++) {
-    const cap: Capture = captures[i];
-    if (!cap.image) continue;
-    const row = rows[i];
-    const p = blank();
-    const num = `capture-${row.num}`;
-    p.g.fillStyle = INK;
-    p.g.font = "700 34px Pretendard";
-    p.g.fillText(num, M, M);
+  // --- 사진 페이지: 사진 1장당 1페이지 (번호·태그·시각·note는 exportModel로 파생 — prompt.md와 lockstep) ---
+  // 캡처에 사진이 2장이면 capture-NNa / capture-NNb 두 페이지. 캡션 전문은 첫 장에만 싣고
+  // 둘째 장은 "이어짐" 한 줄만 — 사진에 더 넓은 영역을 준다(OCR 정확도 우선, ADR-020).
+  for (const row of captureRows(captures)) {
+    for (let j = 0; j < row.photos.length; j++) {
+      const shot = row.photos[j];
+      const cont = j > 0; // 이어지는 페이지
+      const p = blank();
+      p.g.fillStyle = INK;
+      p.g.font = "700 34px Pretendard";
+      p.g.fillText(shot.label, M, M);
 
-    const availW = W - M * 2;
-    const availH = H - (M + 70) - 320;
-    // 사진은 디코드 없이 JPEG를 PDF에 직접 삽입한다(addPage 뒤 doc.addImage). 여기선 dataURL+치수만 준비.
-    // 한 장이 실패해도 PDF 전체가 깨지지 않게 장별 격리 — 실패 시 "텍스트만" 페이지.
-    let photo: { dataUrl: string; w: number; h: number } | null = null;
-    try {
-      const dataUrl = await blobToDataUrl(cap.image);
-      let w = cap.imageW || 0;
-      let h = cap.imageH || 0;
-      if (!w || !h) {
-        const props = doc.getImageProperties(dataUrl);
-        w = props.width;
-        h = props.height;
+      const availW = W - M * 2;
+      const availH = H - (M + 70) - (cont ? 140 : 320);
+      // 사진은 디코드 없이 JPEG를 PDF에 직접 삽입한다(addPage 뒤 doc.addImage). 여기선 dataURL+치수만 준비.
+      // 한 장이 실패해도 PDF 전체가 깨지지 않게 장별 격리 — 실패 시 "텍스트만" 페이지.
+      let photo: { dataUrl: string; w: number; h: number } | null = null;
+      try {
+        const dataUrl = await blobToDataUrl(shot.blob);
+        let w = shot.width || 0;
+        let h = shot.height || 0;
+        if (!w || !h) {
+          const props = doc.getImageProperties(dataUrl);
+          w = props.width;
+          h = props.height;
+        }
+        photo = { dataUrl, w, h };
+      } catch {
+        photo = null;
       }
-      photo = { dataUrl, w, h };
-    } catch {
-      photo = null;
-    }
-    if (!photo) {
-      p.g.fillStyle = SUB;
-      p.g.font = "400 28px Pretendard";
-      p.g.fillText("(사진을 불러오지 못했어요 — 텍스트만 포함)", M, M + 100);
-    }
+      if (!photo) {
+        p.g.fillStyle = SUB;
+        p.g.font = "400 28px Pretendard";
+        p.g.fillText("(사진을 불러오지 못했어요 — 텍스트만 포함)", M, M + 100);
+      }
 
-    let cy = M + 70 + availH + 24;
-    p.g.fillStyle = INK;
-    p.g.font = "600 30px Pretendard";
-    p.g.fillText(`${row.tagEmoji} ${row.tagLabel}`, M, cy);
-    cy += 44;
-    p.g.fillStyle = SUB;
-    p.g.font = "400 26px Pretendard";
-    const meta = [row.time, row.page ? `p.${row.page}` : null]
-      .filter(Boolean)
-      .join("  ·  ");
-    p.g.fillText(meta, M, cy);
-    cy += 40;
-    p.g.fillStyle = INK;
-    if (row.passage) {
-      for (const ln of wrap(p.g, `담은 글: ${row.passage}`, W - M * 2)) {
-        p.g.fillText(ln, M, cy);
-        cy += 36;
+      let cy = M + 70 + availH + 24;
+      const meta = [row.time, row.page ? `p.${row.page}` : null].filter(Boolean).join("  ·  ");
+      if (cont) {
+        p.g.fillStyle = SUB;
+        p.g.font = "400 26px Pretendard";
+        p.g.fillText(`${row.photos[0].label}에서 이어짐  ·  ${row.tagLabel}  ·  ${meta}`, M, cy);
+      } else {
+        p.g.fillStyle = INK;
+        p.g.font = "600 30px Pretendard";
+        p.g.fillText(`${row.tagEmoji} ${row.tagLabel}`, M, cy);
+        cy += 44;
+        p.g.fillStyle = SUB;
+        p.g.font = "400 26px Pretendard";
+        p.g.fillText(meta, M, cy);
+        cy += 40;
+        p.g.fillStyle = INK;
+        if (row.passage) {
+          for (const ln of wrap(p.g, `담은 글: ${row.passage}`, W - M * 2)) {
+            p.g.fillText(ln, M, cy);
+            cy += 36;
+          }
+        }
+        if (row.note) {
+          for (const ln of wrap(p.g, `내 생각: ${row.note}`, W - M * 2)) {
+            p.g.fillText(ln, M, cy);
+            cy += 36;
+          }
+        }
       }
-    }
-    if (row.note) {
-      for (const ln of wrap(p.g, `내 생각: ${row.note}`, W - M * 2)) {
-        p.g.fillText(ln, M, cy);
-        cy += 36;
+      addPage(p.c);
+      if (photo) {
+        const scale = Math.min(availW / photo.w, availH / photo.h);
+        const dw = photo.w * scale;
+        const dh = photo.h * scale;
+        // 디코드 없이 압축 JPEG를 페이지에 직접 삽입(iOS 메모리 무관).
+        doc.addImage(photo.dataUrl, "JPEG", (W - dw) / 2, M + 70, dw, dh);
       }
+      photo = null; // dataURL은 한 번에 하나만 살아 있게 — iOS 메모리(ADR-013/015)
+      await new Promise((r) => setTimeout(r, 0));
     }
-    addPage(p.c);
-    if (photo) {
-      const scale = Math.min(availW / photo.w, availH / photo.h);
-      const dw = photo.w * scale;
-      const dh = photo.h * scale;
-      // 디코드 없이 압축 JPEG를 페이지에 직접 삽입(iOS 메모리 무관).
-      doc.addImage(photo.dataUrl, "JPEG", (W - dw) / 2, M + 70, dw, dh);
-    }
-    await new Promise((r) => setTimeout(r, 0));
   }
 
   return doc.output("blob");
