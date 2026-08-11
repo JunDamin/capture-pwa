@@ -611,8 +611,10 @@
   font-size: 26px;
   font-weight: 400;
 }
+/* 책 목록 아래 — 맨 위 책 카드 바로 밑에 두면 "이 책을 시작"으로 오독된다 */
 .home__start {
-  margin-bottom: 28px;
+  margin-top: 20px;
+  margin-bottom: 8px;
 }
 
 /* 카드 모드 버튼 스트립 (홈 topCard + recentItem) */
@@ -1122,6 +1124,12 @@
   bottom: calc(16px + var(--safe-bottom));
   width: min(100% - 40px, 600px);
 }
+/* renderProject의 "독서 시작" — 카드 밖으로 빼되 하단 고정은 하지 않는다.
+   이 화면은 마운트 시 목적 입력에 포커스가 걸려 키보드가 바로 올라오는데,
+   iOS에서 fixed CTA + 키보드 조합은 실기기 없이 검증할 수 없다. */
+.books .start {
+  margin-top: 16px;
+}
 
 .bookrow__edit {
   min-width: 48px;
@@ -1135,8 +1143,8 @@
 }
 
 .bookrow__del {
-  min-width: 44px;
-  min-height: 44px;
+  min-width: 48px;
+  min-height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1575,6 +1583,24 @@
 }
 .install-sheet__t { font-weight: 700; font-size: 18px; color: var(--ink); margin-bottom: 8px; }
 .install-sheet__s { color: var(--sub); font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+
+/* ---- 확인 시트 (네이티브 confirm 대체) — install-sheet과 같은 스크림+하단 카드 셸 ---- */
+.confirm-sheet {
+  position: fixed; inset: 0; z-index: 60; background: rgba(25,31,40,0.4);
+  display: grid; place-items: end center; padding: 16px;
+}
+.confirm-sheet__card {
+  background: #fff; border-radius: 20px; width: 100%; max-width: 420px;
+  padding: 24px 20px calc(env(safe-area-inset-bottom, 0px) + 14px);
+  text-align: center;
+}
+.confirm-sheet__t { font-weight: 700; font-size: 18px; color: var(--ink); margin-bottom: 8px; }
+.confirm-sheet__s { color: var(--sub); font-size: 14px; line-height: 1.5; margin-bottom: 16px; }
+/* 파괴적 액션만 빨강 — 팔레트의 유일한 예외이자 되돌릴 수 없다는 신호.
+   btn-primary의 파란 글로우까지 물려받으면 빨강 위에 파란 그림자가 남는다. */
+.confirm-sheet__ok.is-danger { background: #f04452; box-shadow: 0 8px 20px rgba(240, 68, 82, 0.3); }
+.confirm-sheet__ok.is-danger:active { background: #d93a47; }
+.confirm-sheet__cancel { width: 100%; min-height: 48px; margin-top: 8px; }
 
 /* ---- 크롭 프레임 오버레이 (라이브 카메라 위) ---- */
 .cropframe { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
