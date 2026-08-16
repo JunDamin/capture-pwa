@@ -95,25 +95,6 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
       };
     });
 
-    root.querySelectorAll<HTMLElement>(".bookrow__del").forEach((el) => {
-      el.onclick = async (ev) => {
-        ev.stopPropagation();
-        const id = el.dataset.del!;
-        const b = books.find((x) => x.uuid === id);
-        const caps = await capturesForBook(id);
-        // 제목은 body로 — 『…』 뒤 조사는 받침에 따라 을/를이 갈려 자동 생성이 틀린다
-        const ok = await confirmSheet({
-          title: "이 책을 삭제할까요?",
-          body: `『${b?.title ?? "이 책"}』의 기록과 캡처 ${caps.length}개가 함께 지워져요. 되돌릴 수 없어요.`,
-          confirmLabel: "삭제",
-          destructive: true,
-        });
-        if (!ok) return;
-        await deleteBook(id);
-        books = await listBooks();
-        renderList();
-      };
-    });
   }
 
   function renderProject() {
@@ -178,6 +159,8 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         ${getTtbKey() ? `<button class="btn-ghost coverfind">표지 찾기</button><div class="coverres"></div>` : ""}
         <button class="btn-primary save">저장</button>
       </div>
+
+      <button class="book-delete">이 책 삭제</button>
 
       <div class="toast" hidden></div>
     </div>`;
@@ -249,6 +232,22 @@ export function mountBooks(root: HTMLElement, nav: Nav): () => void {
         };
       });
     }
+    // 삭제는 목록 행이 아니라 편집 화면 안에 — 파괴적 액션을 의도적 진입 뒤로 한 단계 미룬다
+    (root.querySelector(".book-delete") as HTMLButtonElement).onclick = async () => {
+      const caps = await capturesForBook(book.uuid);
+      // 제목은 body로 — 『…』 뒤 조사는 받침에 따라 을/를이 갈려 자동 생성이 틀린다
+      const ok = await confirmSheet({
+        title: "이 책을 삭제할까요?",
+        body: `『${book.title}』의 기록과 캡처 ${caps.length}개가 함께 지워져요. 되돌릴 수 없어요.`,
+        confirmLabel: "삭제",
+        destructive: true,
+      });
+      if (!ok) return;
+      await deleteBook(book.uuid);
+      books = await listBooks();
+      renderList("삭제했어요");
+    };
+
     (root.querySelector(".save") as HTMLButtonElement).onclick = async () => {
       const title = titleEl.value.trim();
       if (!title) {
@@ -288,7 +287,6 @@ function bookRow(b: Book, urls: string[]) {
         ${b.author ? `<div class="item__s">${esc(b.author)}</div>` : ""}
       </div>
       <button class="bookrow__edit" data-edit="${b.uuid}" aria-label="책 편집">✎</button>
-      <button class="bookrow__del" data-del="${b.uuid}" aria-label="책 삭제">🗑</button>
       <div class="chev">›</div>
     </div>
     <div class="card-modes">
