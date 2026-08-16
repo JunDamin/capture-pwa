@@ -49,9 +49,12 @@ export async function searchCaptures(q: string, limit = 200): Promise<SearchResu
 ```
 
 - 커서로 `byCreated` 역순 순회(최신 우선). 매치가 `limit`에 닿으면 **조기 종료**하고 `truncated: true`.
-- 대상 필드: `passage`, `memo`, `why`(레거시 — ADR-014대로 note로 합쳐 취급), `ocr`. `page`·`tag`는 제외.
+- 대상 필드: `passage`, `memo`, `why`(레거시 — ADR-014대로 note로 합쳐 취급). `page`·`tag`는 제외.
+  - **`ocr`은 검색하지 않는다.** 타입에는 있지만 저장소 전체에서 `ocr: null` 외의 쓰기가 **0건**이다(2026-08-12 확인). 죽은 필드를 검색 대상으로 적으면 테스트로 덮을 것도 없고 읽는 사람을 오해시킨다. 나중에 실제로 채워지면 그때 추가한다.
 - 매칭: 양쪽 `trim` + `toLowerCase()` 부분일치. 한글은 그대로 substring(자모 분해·초성 검색은 범위 밖).
+- **스니펫:** 매치 위치 기준 앞 20자 / 뒤 60자를 잘라 양옆에 `…`. 필드 전체가 그보다 짧으면 그대로.
 - **커서 루프 안에서 레코드를 배열에 담지 않는다.** 뽑은 텍스트로 `CaptureHit`만 만들고 원본 참조는 버린다. `fromStored`를 호출하지 않는다(Blob 생성 회피).
+- **주기적 양보:** 100건마다 `await new Promise(r => setTimeout(r, 0))`. 커서는 레코드마다 이미지 ArrayBuffer를 잠깐씩 디시리얼라이즈하는데, 쉬지 않고 돌면 GC가 따라오기 전에 수백 개가 쌓일 수 있다. `pdf.ts`가 페이지마다 이벤트 루프에 양보하는 것과 같은 이유다. 이건 "열린 위험"이 아니라 **설계에 넣는 완화책**이다.
 
 책 검색은 별도 함수가 필요 없다 — `listBooks()`를 화면에서 필터하면 된다. `Book.cover`는 ArrayBuffer라 `getAll("books")`가 표지 바이트를 함께 읽지만, **홈이 이미 매 진입마다 그렇게 하고 있고**(`recentBooks` → `listBooks`) 책 수는 캡처 수보다 한두 자릿수 적다. 즉 검색이 새로 만드는 부담이 아니다.
 
@@ -61,9 +64,21 @@ export async function searchCaptures(q: string, limit = 200): Promise<SearchResu
 
 `home.ts`의 `<h1>내 책</h1>` 아래에 검색 입력 한 줄. 2글자 이상 입력 시 **200ms 디바운스** 후 `nav({name:"search", q})`. 홈은 캡처 루프가 아니므로 3초 예산과 무관하다.
 
+**한글 조합 중 검색하지 않는다.** iOS에서 한글을 치면 조합 중에도 `input`이 매 자모마다 발화해 "ㄱ→가→간→갇…"으로 헛검색이 돈다. `compositionstart`/`compositionend`로 조합 중에는 디바운스 타이머를 걸지 않는다(200ms 디바운스만으로는 조합이 느린 입력에서 새어 나간다). 검색 화면 안의 입력도 동일.
+
 ### 새 화면 `src/screens/search.ts`
 
 `mountSearch(root, nav, initialQ): () => void` — 기존 화면 패턴(cleanup 반환) 그대로. `app.ts`의 `Route`에 `{ name: "search"; q: string }` 추가.
+
+**뒤로가기가 검색어를 잃지 않아야 한다.** 지금 detail 라우트의 `from`은 `{ scope: Scope; id: string }`뿐이고 `Scope = "session" | "book"`이라, 검색 결과에서 캡처를 열면 뒤로가기가 리뷰 화면으로 간다 — 검색어가 날아간다. 여러 결과를 훑어보는 게 검색의 본질이므로 이건 못 넘긴다. `from`을 넓힌다:
+
+```ts
+| { name: "detail"; captureId: string; from: { scope: Scope; id: string } | { scope: "search"; q: string } }
+```
+
+`Scope` 자체는 건드리지 않는다 — `review.ts`가 `scope`로 `capturesForSession`/`capturesForBook`을 가르므로 거기에 `"search"`를 섞으면 깨진다. `detail.ts`의 `back`만 분기하면 된다.
+
+**objectURL 수명:** 결과의 책 헤더에 표지가 나오므로 `home.ts`/`books.ts`와 같이 만든 URL을 모아 재렌더·cleanup에서 revoke한다. 검색은 타이핑마다 재렌더되므로 여기서 새는 게 다른 화면보다 아프다.
 
 상단 검색 입력(자동 포커스·현재 질의 유지) + 결과. 입력이 바뀌면 같은 디바운스로 재검색하되 화면 전환은 하지 않는다.
 
@@ -98,6 +113,8 @@ export async function searchCaptures(q: string, limit = 200): Promise<SearchResu
 3. 책 제목 매치와 캡처 매치가 한 화면에 함께 묶인다.
 4. `limit`을 낮춰 `truncated: true`가 되고 화면에 그 사실이 표시된다.
 5. 결과 없음 문구가 뜬다.
+6. **검색 → 캡처 상세 → 뒤로가기가 검색 결과로 돌아오고 검색어가 남아 있다.**
+7. 검색을 반복해도 objectURL이 누수되지 않는다(생성 수 = revoke 수).
 
 추가로 `npm run build` / 기존 `test:pdf` / `test:camera` 회귀 확인.
 
@@ -106,4 +123,5 @@ export async function searchCaptures(q: string, limit = 200): Promise<SearchResu
 ## 열린 위험
 
 - **O(N) 훑기.** 캡처 수백 개까지는 문제없을 것으로 보지만 실기기 수치가 없다. 느리면 보조 저장소(위 §채택하지 않은 것)로 간다 — 그 전환은 `searchCaptures`의 시그니처를 바꾸지 않으므로 화면 코드는 그대로다. 이게 좁은 인터페이스로 감싸는 이유다.
-- **커서 순회 중 이미지 디시리얼라이즈가 건별로 일어난다.** 한 건씩이라 안전하다고 보지만, 3200px JPEG가 수백 개면 누적 GC 압박은 실측이 필요하다.
+- **커서 순회 중 이미지 디시리얼라이즈가 건별로 일어난다.** 100건마다 이벤트 루프에 양보해 완화하지만(위 §DB 계층), 3200px JPEG가 수백 개일 때 실제로 충분한지는 **실기기 수치가 없다**. 이 설계에서 유일하게 "해보기 전엔 모른다"에 남는 부분이다.
+- **`why`는 레거시 읽기 전용이라 신규 캡처엔 없다.** 검색 대상에 넣는 건 옛 캡처를 위한 것이고, 시간이 지나면 죽은 코드가 된다. `ocr`처럼 되기 전에 주기적으로 재검토할 것.
