@@ -171,6 +171,20 @@ async function run() {
   await page.waitForTimeout(500);
   out.urls = await page.evaluate(() => ({ ...window.__urls }));
 
+  // ---- 홈 진입 ----
+  await page.waitForSelector(".home__search", { timeout: 8000 });
+  // 1글자는 진입하지 않는다
+  await page.fill(".home__search", "허");
+  await page.waitForTimeout(500);
+  out.oneChar = await page.evaluate(() => !!document.querySelector(".search"));
+  // 2글자면 진입한다
+  await page.fill(".home__search", "허구");
+  await page.waitForSelector(".search", { timeout: 8000 });
+  out.twoChar = await page.evaluate(() => ({
+    onSearch: !!document.querySelector(".search"),
+    query: document.querySelector(".search__input").value,
+  }));
+
   await browser.close();
   return { out, errors };
 }
@@ -257,6 +271,13 @@ function check(out, errors) {
   // objectURL 누수
   if (out.urls.made !== out.urls.freed) {
     fail.push(`objectURL 누수: 생성 ${out.urls.made} / 해제 ${out.urls.freed}`);
+  }
+
+  // 홈 진입
+  if (out.oneChar) fail.push("한 글자만 입력했는데 검색 화면으로 넘어감");
+  if (!out.twoChar.onSearch) fail.push("두 글자를 입력했는데 검색 화면으로 안 넘어감");
+  if (out.twoChar.query !== "허구") {
+    fail.push(`홈에서 넘긴 검색어가 틀림: ${out.twoChar.query}`);
   }
   return fail;
 }

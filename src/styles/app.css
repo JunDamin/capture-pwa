@@ -1756,3 +1756,11 @@
   outline: 2px solid var(--primary);
   outline-offset: -2px;
 }
+.home__search {
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+.home__search:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
