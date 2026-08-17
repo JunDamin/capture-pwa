@@ -1646,3 +1646,121 @@
 .bookpick__title { font-size: 15px; font-weight: 600; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .bookpick__sub { font-size: 12px; color: var(--sub); }
 .bookpick__check { margin-left: auto; color: var(--primary); font-weight: 700; }
+
+/* ---- 전역 검색 (ADR-022) ---- */
+.search__input {
+  flex: 1;
+  min-width: 0;
+  min-height: 44px;
+}
+.search__empty,
+.search__more {
+  color: var(--sub);
+  font-weight: 500;
+  text-align: center;
+  padding: 28px 10px;
+  line-height: 1.6;
+}
+.search__more {
+  padding: 18px 10px;
+  font-size: 13px;
+}
+.sgroup {
+  margin-bottom: 18px;
+}
+/* 책 헤더 — 탭하면 그 책 리뷰로 */
+.sgroup__t {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 56px;
+  padding: 8px 4px;
+  background: none;
+  border: none;
+  text-align: left;
+  cursor: pointer;
+}
+.sgroup__body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.sgroup__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sgroup__author {
+  font-size: 12px;
+  color: var(--sub);
+}
+.sgroup__n {
+  flex: 0 0 auto;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--sub);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 4px 10px;
+}
+/* 히트 카드 — 리뷰 카드와 같은 시각 언어, 다만 썸네일 없이 스니펫 중심 */
+.shit {
+  padding: 10px 12px;
+  margin: 6px 0 0 20px;
+  background: var(--surface);
+  border-radius: 12px;
+  min-height: 48px;
+  cursor: pointer;
+}
+.shit:active {
+  background: #e8ebee;
+}
+.shit__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  margin-bottom: 4px;
+}
+.shit__where,
+.shit__time {
+  color: var(--sub);
+  font-weight: 600;
+}
+.shit__time {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.shit__snippet {
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ink);
+}
+/* 매치 강조 — 파랑 하나 규율 유지(새 색 만들지 않음) */
+.search mark {
+  background: rgba(49, 130, 246, 0.16);
+  color: var(--primary);
+  font-weight: 700;
+  border-radius: 3px;
+  padding: 0 1px;
+}
+/* 진입 시 자동 포커스라 링이 바로 보인다 — UA 기본 링은 팔레트 밖 색이다.
+   저장소 전체에 :focus 스타일이 없다는 건 별개 문제(디자인 언어 "키보드 포커스 가시"). */
+.search__input:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}
+.home__search {
+  margin-bottom: 16px;
+  background: var(--surface);
+}
+.home__search:focus {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+}

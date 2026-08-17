@@ -1,6 +1,6 @@
 /** IndexedDB 저장소 — PRD §12. 서버/로그인 없음. 이미지는 ArrayBuffer(ADR-015, ADR-003 개정). */
 import { openDB, type DBSchema, type IDBPDatabase } from "idb";
-import type { Book, Capture, Session } from "./types.ts";
+import type { Book, Capture, Session, Tag } from "./types.ts";
 
 // --- iOS IDB-Blob 버그 회피 (ADR-015) ---
 // iOS Safari가 저장된 Blob을 나중에 읽지 못함(NotFoundError). ArrayBuffer는 안정적.
@@ -131,6 +131,91 @@ export async function countCaptures(sessionId: string): Promise<number> {
 }
 export async function deleteCapture(id: string) {
   await (await db()).delete("captures", id);
+}
+
+// --- 검색 (ADR-022) ---
+// 계약: 반환 타입에 이미지 필드를 담지 않는다. passage/memo가 이미지와 같은 레코드에
+// 있어서, 텍스트를 찾겠다고 allCaptures()를 쓰면 모든 사진이 Blob으로 되살아난다
+// (ADR-013/015). 여기서는 fromStored를 부르지 않고 텍스트만 뽑아 즉시 버린다.
+
+/** 검색 결과 1건 — 이미지 필드가 없는 것이 이 타입의 계약이다. */
+export interface CaptureHit {
+  uuid: string;
+  sessionId: string;
+  createdAt: number;
+  tag: Tag;
+  snippet: string; // 매치 주변 발췌(양옆 말줄임)
+  field: "passage" | "memo"; // why 매치는 memo로 보고한다(ADR-014)
+}
+
+export interface SearchResult {
+  hits: CaptureHit[];
+  truncated: boolean; // limit에 걸려 중단됨 — 화면에 반드시 표시할 것
+}
+
+const SNIPPET_BEFORE = 20;
+const SNIPPET_AFTER = 60;
+const YIELD_EVERY = 100;
+
+function snippetAround(text: string, at: number, qLen: number): string {
+  const s = Math.max(0, at - SNIPPET_BEFORE);
+  const e = Math.min(text.length, at + qLen + SNIPPET_AFTER);
+  return `${s > 0 ? "…" : ""}${text.slice(s, e)}${e < text.length ? "…" : ""}`;
+}
+
+/**
+ * 캡처 본문 검색 — 최신 우선, limit에서 조기 종료.
+ *
+ * 커서를 쓰지 않는 이유: IDB 트랜잭션은 대기 중인 요청 없이 이벤트 루프로 나가면
+ * 자동 종료된다. 커서 루프 안에서 setTimeout(0)으로 양보하면 트랜잭션이 죽어
+ * 다음 continue()가 던진다. 그래서 값 없이 키만 먼저 받고(getAllKeysFromIndex —
+ * uuid 문자열 배열뿐, 이미지 부담 0) 건별 get으로 훑는다. get은 각각 독립
+ * 트랜잭션이라 언제든 양보해도 안전하고, 메모리 상주는 항상 한 건이다.
+ */
+export async function searchCaptures(q: string, limit = 200): Promise<SearchResult> {
+  const needle = q.trim().toLowerCase();
+  const hits: CaptureHit[] = [];
+  if (!needle) return { hits, truncated: false };
+
+  const d = await db();
+  const keys = await d.getAllKeysFromIndex("captures", "byCreated"); // createdAt 오름차순
+  let truncated = false;
+
+  for (let i = keys.length - 1; i >= 0; i--) {
+    // 최신 우선
+    const rec = (await d.get("captures", keys[i])) as unknown as Record<string, unknown>;
+    if (rec) {
+      // 텍스트만 뽑고 레코드 참조는 이 블록을 벗어나며 버려진다
+      const memo = [rec.memo, rec.why].filter((s) => s && String(s).trim()).join(" · ");
+      const fields: [CaptureHit["field"], string][] = [
+        ["passage", (rec.passage as string) ?? ""],
+        ["memo", memo],
+      ];
+      for (const [field, text] of fields) {
+        const at = text.toLowerCase().indexOf(needle);
+        if (at < 0) continue;
+        hits.push({
+          uuid: rec.uuid as string,
+          sessionId: rec.sessionId as string,
+          createdAt: rec.createdAt as number,
+          tag: rec.tag as Tag,
+          field,
+          snippet: snippetAround(text, at, needle.length),
+        });
+        break; // 캡처당 1건
+      }
+      if (hits.length >= limit) {
+        truncated = true;
+        break;
+      }
+    }
+    // 이미지 ArrayBuffer가 건별로 디시리얼라이즈되므로 GC에 숨 쉴 틈을 준다(pdf.ts와 같은 이유)
+    if ((keys.length - i) % YIELD_EVERY === 0) {
+      await new Promise((r) => setTimeout(r, 0));
+    }
+  }
+
+  return { hits, truncated };
 }
 
 /** 세션 삭제 — 그 세션의 캡처 전부 삭제 후 세션 레코드 삭제. (deleteBook 내부 전용) */

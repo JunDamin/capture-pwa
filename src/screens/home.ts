@@ -28,8 +28,12 @@ function startOfDay(ts: number) {
 
 const coverClass = (i: number) => `cov-${(i % 3) + 1}`;
 
+const SEARCH_MIN = 2;
+const SEARCH_DEBOUNCE_MS = 200;
+
 export function mountHome(root: HTMLElement, nav: Nav): () => void {
   const urls: string[] = []; // 표지 objectURL — 재렌더/이탈 시 revoke
+  let searchTimer: number | null = null; // 검색 디바운스 — cleanup에서 해제
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   (async () => {
@@ -46,6 +50,8 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
     root.innerHTML = `
     <div class="scr scr--light home">
       <h1 class="home__h">내 책</h1>
+      <input class="field home__search" placeholder="책·캡처 검색" autocomplete="off"
+             autocorrect="off" enterkeyhint="search" />
       ${top}
       ${rest.length ? `<div class="sectit">다른 책 <button class="home__books-link">책장 →</button></div><div class="recent">${rest.map(bookItem).join("")}</div>` : ""}
       <button class="btn-primary home__start">새 책 시작하기</button>
@@ -56,6 +62,30 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
 
     const startBtn = root.querySelector(".home__start") as HTMLButtonElement;
     startBtn.onclick = () => nav({ name: "books" });
+
+    // 검색 — 2글자 이상 + 디바운스. 한글은 조합 중 input이 자모마다 발화해
+    // "ㄱ→가→간"으로 헛검색이 돈다. 조합이 끝난 뒤에만 판단한다(ADR-022).
+    const searchEl = root.querySelector(".home__search") as HTMLInputElement;
+    let composing = false;
+    const go = () => {
+      const q = searchEl.value.trim();
+      if (q.length >= SEARCH_MIN) nav({ name: "search", q });
+    };
+    const schedule = () => {
+      if (searchTimer != null) clearTimeout(searchTimer);
+      searchTimer = window.setTimeout(go, SEARCH_DEBOUNCE_MS);
+    };
+    searchEl.addEventListener("compositionstart", () => {
+      composing = true;
+    });
+    searchEl.addEventListener("compositionend", () => {
+      composing = false;
+      schedule();
+    });
+    searchEl.oninput = () => {
+      if (composing) return; // compositionend가 한 번 돌린다
+      schedule();
+    };
 
     // "책장 →" — [data-book] 위임과 분리된 전용 배선
     const booksLink = root.querySelector(".home__books-link") as HTMLButtonElement | null;
@@ -147,6 +177,8 @@ export function mountHome(root: HTMLElement, nav: Nav): () => void {
   }
 
   return () => {
+    if (searchTimer != null) clearTimeout(searchTimer); // 이탈 후 늦은 nav 방지
+    searchTimer = null;
     urls.forEach((u) => URL.revokeObjectURL(u));
     urls.length = 0;
   };

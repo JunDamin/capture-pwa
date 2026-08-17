@@ -5,6 +5,7 @@ import { mountCapture } from "./screens/capture.ts";
 import { mountReview } from "./screens/review.ts";
 import { mountExport } from "./screens/export.ts";
 import { mountDetail } from "./screens/detail.ts";
+import { mountSearch } from "./screens/search.ts";
 import { mountTransfer } from "./screens/transfer.ts";
 
 export type Scope = "session" | "book";
@@ -15,8 +16,17 @@ export type Route =
   | { name: "capture"; sessionId: string; mode?: "photo" | "input" }
   | { name: "review"; scope: Scope; id: string }
   | { name: "export"; scope: Scope; id: string }
-  | { name: "detail"; captureId: string; from: { scope: Scope; id: string } }
+  | { name: "search"; q: string }
+  // 검색에서 연 캡처는 뒤로가기가 검색 결과로 돌아가야 한다(검색어 유지) — ADR-022.
+  // Scope 자체는 넓히지 않는다: review.ts가 scope로 조회 방식을 가르므로 "search"를 섞으면 깨진다.
+  | {
+      name: "detail";
+      captureId: string;
+      from: { scope: Scope; id: string } | { scope: "search"; q: string };
+    }
   | { name: "transfer" };
+
+export type DetailFrom = Extract<Route, { name: "detail" }>["from"];
 
 export type Nav = (route: Route) => void;
 
@@ -45,6 +55,9 @@ export function mountApp(root: HTMLElement) {
         break;
       case "export":
         cleanup = mountExport(root, nav, route.scope, route.id);
+        break;
+      case "search":
+        cleanup = mountSearch(root, nav, route.q);
         break;
       case "detail":
         cleanup = mountDetail(root, nav, route.captureId, route.from);
