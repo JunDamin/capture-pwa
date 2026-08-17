@@ -109,6 +109,68 @@ async function run() {
     return r;
   });
 
+  // ---- 화면 단언 ----
+  // objectURL 누수 감시 — 생성/해제 수를 센다
+  await page.evaluate(() => {
+    window.__urls = { made: 0, freed: 0 };
+    const co = URL.createObjectURL.bind(URL);
+    const ro = URL.revokeObjectURL.bind(URL);
+    URL.createObjectURL = (b) => { window.__urls.made++; return co(b); };
+    URL.revokeObjectURL = (u) => { window.__urls.freed++; return ro(u); };
+  });
+
+  await page.evaluate(async () => {
+    const { mountApp } = await import("/src/app.ts");
+    const root = document.getElementById("app");
+    root.innerHTML = "";
+    window.__nav = mountApp(root);
+    window.__nav({ name: "search", q: "허구" });
+  });
+  await page.waitForSelector(".search", { timeout: 8000 });
+  await page.waitForTimeout(500);
+
+  out.screen = await page.evaluate(() => ({
+    query: document.querySelector(".search__input").value,
+    groups: Array.from(document.querySelectorAll(".sgroup")).map((g) => ({
+      book: g.querySelector(".sgroup__t").textContent.trim(),
+      hits: g.querySelectorAll(".shit").length,
+    })),
+    marks: Array.from(document.querySelectorAll(".shit mark")).map((m) => m.textContent),
+  }));
+
+  // 책 제목만 매치 — 캡처 매치가 없어도 헤더가 나와야 한다
+  await page.evaluate(() => window.__nav({ name: "search", q: "코스모스" }));
+  await page.waitForTimeout(600);
+  out.titleOnly = await page.evaluate(() => ({
+    groups: Array.from(document.querySelectorAll(".sgroup")).map((g) => g.querySelector(".sgroup__t").textContent.trim()),
+    badges: Array.from(document.querySelectorAll(".sgroup__n")).map((b) => b.textContent.trim()),
+  }));
+
+  // 결과 없음
+  await page.evaluate(() => window.__nav({ name: "search", q: "존재하지않는말" }));
+  await page.waitForTimeout(600);
+  out.emptyState = await page.evaluate(() => document.querySelector(".search__empty")?.textContent ?? null);
+
+  // 검색 → 캡처 상세 → 뒤로 = 검색 복귀 + 검색어 유지
+  await page.evaluate(() => window.__nav({ name: "search", q: "허구" }));
+  await page.waitForSelector(".shit", { timeout: 8000 });
+  await page.click(".shit");
+  await page.waitForSelector(".detail", { timeout: 8000 });
+  await page.waitForTimeout(300);
+  await page.click(".detail .back");
+  await page.waitForSelector(".search", { timeout: 8000 });
+  await page.waitForTimeout(400);
+  out.backToSearch = await page.evaluate(() => ({
+    onSearch: !!document.querySelector(".search"),
+    query: document.querySelector(".search__input")?.value ?? null,
+    hits: document.querySelectorAll(".shit").length,
+  }));
+
+  // objectURL 누수 — 화면을 떠나면 만든 만큼 해제돼야 한다
+  await page.evaluate(() => window.__nav({ name: "home" }));
+  await page.waitForTimeout(500);
+  out.urls = await page.evaluate(() => ({ ...window.__urls }));
+
   await browser.close();
   return { out, errors };
 }
@@ -156,6 +218,45 @@ function check(out, errors) {
   // 6) 다른 책
   if (JSON.stringify(out.other) !== JSON.stringify(["cap-other"])) {
     fail.push(`"코스모스" 검색 결과가 틀림: ${JSON.stringify(out.other)}`);
+  }
+
+  // --- 화면 ---
+  if (out.screen.query !== "허구") fail.push(`검색 입력에 질의가 안 남음: ${out.screen.query}`);
+  if (out.screen.groups.length !== 1) {
+    fail.push(`"허구"는 사피엔스 한 권에만 있어야 함: ${JSON.stringify(out.screen.groups)}`);
+  } else {
+    if (!out.screen.groups[0].book.includes("사피엔스")) {
+      fail.push(`책 헤더가 틀림: ${out.screen.groups[0].book}`);
+    }
+    if (out.screen.groups[0].hits !== 2) {
+      fail.push(`히트 수가 틀림: ${out.screen.groups[0].hits}`);
+    }
+  }
+  if (!out.screen.marks.length || !out.screen.marks.every((m) => m === "허구")) {
+    fail.push(`매치 강조가 없거나 틀림: ${JSON.stringify(out.screen.marks)}`);
+  }
+
+  // 책 제목만 매치돼도 헤더 노출 — "코스모스"는 책 제목이자 캡처 본문에도 있다
+  if (!out.titleOnly.groups.some((g) => g.includes("코스모스"))) {
+    fail.push(`제목 매치 책이 안 나옴: ${JSON.stringify(out.titleOnly.groups)}`);
+  }
+
+  if (!out.emptyState || !out.emptyState.includes("없어요")) {
+    fail.push(`결과 없음 문구가 없음: ${out.emptyState}`);
+  }
+
+  // 뒤로가기 복귀
+  if (!out.backToSearch.onSearch) fail.push("상세에서 뒤로 갔는데 검색 화면이 아님");
+  if (out.backToSearch.query !== "허구") {
+    fail.push(`뒤로가기 후 검색어를 잃음: ${out.backToSearch.query}`);
+  }
+  if (out.backToSearch.hits !== 2) {
+    fail.push(`뒤로가기 후 결과가 복원되지 않음: ${out.backToSearch.hits}`);
+  }
+
+  // objectURL 누수
+  if (out.urls.made !== out.urls.freed) {
+    fail.push(`objectURL 누수: 생성 ${out.urls.made} / 해제 ${out.urls.freed}`);
   }
   return fail;
 }

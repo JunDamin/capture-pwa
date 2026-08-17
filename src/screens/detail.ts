@@ -1,5 +1,5 @@
 /** 캡처 상세 + 편집 — 큰 사진 + 태그/왜/메모/페이지 수정. PRD §8, ADR-004. */
-import type { Nav, Scope } from "../app.ts";
+import type { DetailFrom, Nav } from "../app.ts";
 import { escapeHtml as esc, formatTime, showToast } from "../lib/ui.ts";
 import { currentRoundFor, getBook, getCapture, getSession, updateCapture } from "../db/db.ts";
 import {
@@ -21,7 +21,7 @@ export function mountDetail(
   root: HTMLElement,
   nav: Nav,
   captureId: string,
-  from: { scope: Scope; id: string },
+  from: DetailFrom,
 ): () => void {
   let photoUrls: string[] = []; // 사진 스트립 objectURL — 렌더마다 교체, cleanup에서 revoke
   let backTimer: number | null = null; // 저장 후 지연 back 타이머 — cleanup에서 해제
@@ -29,7 +29,13 @@ export function mountDetail(
   root.innerHTML = `<div class="scr scr--light"><div class="loading">불러오는 중…</div></div>`;
 
   // back은 진입한 from 유지 — 책을 바꾼 뒤엔 옛 Review에 이 캡처가 없을 수 있음(의도된 수용).
-  const back = () => nav({ name: "review", scope: from.scope, id: from.id });
+  // 검색에서 왔으면 검색어를 들고 검색 결과로 돌아간다(여러 결과를 훑는 게 검색의 본질 — ADR-022).
+  const back = () =>
+    nav(
+      from.scope === "search"
+        ? { name: "search", q: from.q }
+        : { name: "review", scope: from.scope, id: from.id },
+    );
 
   (async () => {
     const cap = await getCapture(captureId);
