@@ -13,17 +13,19 @@ npm run build     # tsc(타입체크) + vite build — 이 저장소의 사실�
 npm run preview   # 프로덕션 빌드 미리보기
 npm run test:pdf  # PDF 생성 스모크(chromium/Playwright) — npx playwright install chromium 선행
 npm run test:camera # 카메라 백그라운드 복귀 스모크(chromium, fake camera) — ADR-021
+npm run test:search # 전역 검색 스모크(chromium) — ADR-022, 이미지 비적재 계약 가드
 ```
 
-- **테스트 프레임워크 없음.** 변경 검증 = `npm run build`(tsc strict) + `npm run preview` 수동 + 해당 시 `npm run test:pdf` / `npm run test:camera`.
-- 두 스모크 모두 **chromium 회귀 가드일 뿐 iOS 보증이 아니다**(ADR-013). 카메라·멀티터치·핀치줌은 실기기 확인 필수.
+- **테스트 프레임워크 없음.** 변경 검증 = `npm run build`(tsc strict) + `npm run preview` 수동 + 해당 시 `npm run test:pdf` / `test:camera` / `test:search`.
+- 스모크는 전부 **chromium 회귀 가드일 뿐 iOS 보증이 아니다**(ADR-013). 카메라·멀티터치·핀치줌·대량 데이터 메모리는 실기기 확인 필수.
 - **배포:** `main`에 push → GitHub Actions가 빌드해 GitHub Pages로 배포. `base`(`/capture-pwa/`)는 워크플로가 저장소 이름으로 주입(`VITE_BASE`).
 
 ## 아키텍처 (큰 그림)
 
 - **인메모리 라우터:** `src/app.ts`가 전체 라우터. `mountApp(root)`이 `nav(route)`를 반환하고, 화면 전환 시 이전 화면의 cleanup(카메라 정지·objectURL revoke 등)을 호출한다. 히스토리/URL 라우팅 없음(브라우저 뒤로가기와 무관).
-- **화면(`src/screens/`):** 각 화면은 `mountX(root, nav, ...args): () => void`(cleanup 반환) 패턴. home / books(책·세션 시작) / capture(캡처 루프) / review(요약·Export 진입) / detail(캡처 상세·편집) / export(PDF·프롬프트) / transfer(백업·가져오기).
+- **화면(`src/screens/`):** 각 화면은 `mountX(root, nav, ...args): () => void`(cleanup 반환) 패턴. home / books(책·세션 시작) / capture(캡처 루프) / review(요약·Export 진입) / detail(캡처 상세·편집) / export(PDF·프롬프트) / transfer(백업·가져오기) / search(전역 검색 — ADR-022).
 - **도메인·저장(`src/db/`):** `types.ts`(Book/Session/Capture + `isValidCapture`), `db.ts`(idb 래퍼, 모든 put이 uuid keyPath upsert). Book 1:N Session, Session 1:N Capture.
+  - **검색은 `searchCaptures()`만 쓴다**(ADR-022). `allCaptures()`로 텍스트를 훑으면 모든 사진이 Blob으로 되살아나 iOS에서 터진다. 반환 타입 `CaptureHit`에 **이미지 필드를 담지 않는 것이 계약**이고 `npm run test:search`가 그걸 단언한다.
 - **라이브러리(`src/lib/`):** `image.ts`(리사이즈/압축), `pdf.ts`(canvas 렌더 PDF), `prompt.ts`(Export 프롬프트 빌더), `share.ts`(Web Share/다운로드), `viewer.ts`(전체화면 줌/크롭), `backup.ts`(JSON 백업/복원), `budget.ts`(캡처 예산 계측), `install.ts`(PWA 설치+공유수신 mailbox), `aladin.ts`(알라딘 표지 검색 JSONP — ADR-017), `bookpicker.ts`(책 선택 시트), `cropframe.ts`(뷰파인더 크롭 프레임).
 - **Export 파이프라인:** Review → Export: **prompt.md는 클립보드로**(내보내기 탭 시 자동 복사, `prompt.ts` v5 — 원문 전사→"계속"→분석 다중 턴), **PDF는 자료 전용**(`pdf.ts` — 요약 표지 1장 + 사진 1장당 1페이지). 둘을 함께 AI에 전달하는 2채널(ADR-019). 외부 AI가 분석(ADR-007).
   - 번호 매김은 `exportModel.ts`에만 있다 — prompt.md와 PDF가 파일명으로 서로를 참조하므로 **반드시 lockstep**. 사진 1장 = `capture-03.jpg`, 2장 = `capture-03a/b.jpg`(ADR-020). 셋 중 하나만 고치지 말 것.
@@ -48,7 +50,7 @@ npm run test:camera # 카메라 백그라운드 복귀 스모크(chromium, fake 
 
 ## 설계 기록·작업 산출물
 
-- **ADR:** `docs/decisions.md`(ADR-001~021). 도메인/아키텍처 결정은 여기서 확인하고, 새 결정은 같은 형식으로 추가.
+- **ADR:** `docs/decisions.md`(ADR-001~022). 도메인/아키텍처 결정은 여기서 확인하고, 새 결정은 같은 형식으로 추가.
 - **PRD/용어:** `PRD.md`, `docs/glossary.md`.
 - **spec/plan:** `docs/superpowers/specs/`, `docs/superpowers/plans/`(브레인스토밍→spec→plan→구현 워크플로 산출물).
 - 커밋·푸시는 사용자가 요청할 때. 기능 작업은 별도 브랜치/워크트리에서.
